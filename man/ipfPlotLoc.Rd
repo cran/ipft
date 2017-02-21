@@ -33,4 +33,3 @@ Plots the spatial location of the observations
                title = 'Position of training set observations')
 
 }
-

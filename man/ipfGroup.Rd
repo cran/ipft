@@ -22,11 +22,10 @@ and assigns an id to each group
 }
 \examples{
 
-    ipfGroup(mtcars, cyl)
+    group <- ipfGroup(mtcars, cyl)
 
-    ipfGroup(mtcars, gear, carb)
+    group <- ipfGroup(mtcars, gear, carb)
 
-    ipfGroup(ipftrain, LONGITUDE, LATITUDE)
+    group <- ipfGroup(ipftrain, LONGITUDE, LATITUDE)
 
 }
-

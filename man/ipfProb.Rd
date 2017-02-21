@@ -14,7 +14,7 @@ ipfProb(train, test, groups, k = 3, FUN = sum, delta = 1, ...)
 \item{groups}{a numeric vector of length = nrow(train) containing the group index
 for the training vectors}
 
-\item{k}{the k parameter for the algorithm (number of similar neighbours)}
+\item{k}{the k parameter for the algorithm (number of similar neighbors)}
 
 \item{FUN}{function to compute the similarity measurement. Default is 'sum'}
 
@@ -24,7 +24,7 @@ for the training vectors}
 }
 \value{
 An S4 class object of type ipfModel, with the following slots:
-                 neighbours -> a matrix with k columns and nrow(test) rows, with the
+                 neighbors -> a matrix with k columns and nrow(test) rows, with the
                                k most similar training observation for each test observation
                  weights ->    a matrix with k columns and nrow(test) rows, with the weights
                  distances ->  a matrix with k columns and nrow(test) rows, with the distances
@@ -43,4 +43,3 @@ This function implements a probabilistic algorithm
     model <- ipfProb(ipftrain[, 1:168], ipftest[, 1:168], groups, k = 9, delta = 10)
 
 }
-

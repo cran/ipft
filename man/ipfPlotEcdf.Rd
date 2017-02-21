@@ -31,4 +31,3 @@ Plots the cumulative distribution function of the estimated error
     ipfPlotEcdf(estimation, title = 'Error cumulative distribution function')
 
 }
-

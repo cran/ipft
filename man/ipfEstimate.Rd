@@ -32,4 +32,3 @@ This function estimates the location of the test observations
     estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
 
 }
-

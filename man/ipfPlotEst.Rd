@@ -5,7 +5,7 @@
 \title{Plots the estimated locations}
 \usage{
 ipfPlotEst(model, estimation, testloc = NULL, observations = c(1),
-  reverseAxis = FALSE, showNeighbours = FALSE, showLabels = FALSE,
+  reverseAxis = FALSE, showneighbors = FALSE, showLabels = FALSE,
   xlab = NULL, ylab = NULL, title = "")
 }
 \arguments{
@@ -19,7 +19,7 @@ ipfPlotEst(model, estimation, testloc = NULL, observations = c(1),
 
 \item{reverseAxis}{swaps axis}
 
-\item{showNeighbours}{plot the k selected neighbours}
+\item{showneighbors}{plot the k selected neighbors}
 
 \item{showLabels}{shows labels}
 
@@ -37,7 +37,6 @@ Plots the estimated locations
     model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168])
     estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
     ipfPlotEst(model, estimation, ipftest[, 169:170], observations = seq(7,10),
-               showNeighbours = TRUE, reverseAxis = TRUE)
+               showneighbors = TRUE, reverseAxis = TRUE)
 
 }
-

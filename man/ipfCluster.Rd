@@ -29,9 +29,9 @@ and assigns a cluster id to each cluster
 }
 \examples{
 
-    ipfCluster(head(ipftrain, 20)[, 169:170], k = 4)
+    clusters <- ipfCluster(head(ipftrain, 20)[, 169:170], k = 4)
 
-    ipfCluster(head(ipftrain[, grep('^wap', names(ipftrain))], 20), method = 'AP')$clusters
+    clusters <- ipfCluster(head(ipftrain[, grep('^wap', names(ipftrain))], 20),
+    method = 'AP')$clusters
 
 }
-

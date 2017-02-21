@@ -43,7 +43,7 @@ double plgd(NumericVector x, NumericVector y, double sd, double epsilon, double 
 }
 
 double norm(NumericVector x, NumericVector y, double normVal) {
-  double d;
+  double d = 0;
   for (int i = 0; i < x.length(); i++) {
     d = d + std::pow((x[i] - y[i]), normVal);
   }

@@ -30,4 +30,3 @@ Plots the probability density function of the estimated error
     ipfPlotPdf(estimation, title = 'Probability density function')
 
 }
-

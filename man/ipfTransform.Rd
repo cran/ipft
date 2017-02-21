@@ -27,7 +27,7 @@ This function returns a vector, matrix or data frame containing
         the transformed data
 }
 \description{
-This function transforms the RSSI data to positive
+This function transforms the RSSI (Received Signal Strength Intensity) data to positive
 or exponential values
 }
 \examples{
@@ -39,4 +39,3 @@ or exponential values
     expTrainRSSI <- ipfTransform(posTrainRSSI, trans = 'exponential', maxRSSI = 104)
 
 }
-

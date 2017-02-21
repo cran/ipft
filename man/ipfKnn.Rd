@@ -2,7 +2,7 @@
 % Please edit documentation in R/ipft.R
 \name{ipfKnn}
 \alias{ipfKnn}
-\title{This function implements the k-nearest neighbours algorithm}
+\title{This function implements the k-nearest neighbors algorithm}
 \usage{
 ipfKnn(train, test, k = 3, method = "euclidean", norm = 2, sd = 5,
   epsilon = 0.001, alpha = 1, threshold = 20, FUN = NULL, ...)
@@ -12,7 +12,7 @@ ipfKnn(train, test, k = 3, method = "euclidean", norm = 2, sd = 5,
 
 \item{test}{a data frame containing the RSSI vectors of the test set}
 
-\item{k}{the k parameter for knn algorithm (number of nearest neighbours)}
+\item{k}{the k parameter for knn algorithm (number of nearest neighbors)}
 
 \item{method}{the method to compute the distance between the RSSI vectors:
 'euclidean', 'manhattan', 'norm', 'LGD' or 'PLGD'}
@@ -36,8 +36,8 @@ test observations to train observations}
 }
 \value{
 An S4 class object of type ipfModel, with the following slots:
-                 neighbours -> a matrix with k columns and nrow(test) rows, with the
-                               k nearest neighbours for each test observation
+                 neighbors -> a matrix with k columns and nrow(test) rows, with the
+                               k nearest neighbors for each test observation
                  weights ->    a matrix with k columns and nrow(test) rows, with the
                                weight for each neighbour
                  distances ->  a matrix with k columns and nrow(test) rows, with the
@@ -46,7 +46,7 @@ An S4 class object of type ipfModel, with the following slots:
                  groups ->     the group index for each training observation
 }
 \description{
-This function implements the k-nearest neighbours algorithm
+This function implements the k-nearest neighbors algorithm
 }
 \examples{
 
@@ -55,4 +55,3 @@ This function implements the k-nearest neighbours algorithm
     model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168], k = 9, method = 'manhattan')
 
 }
-

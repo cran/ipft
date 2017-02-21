@@ -40,11 +40,10 @@ This function computes the distance from every observation
 in the test set to every observation in the train test
 }
 \examples{
-    ipfDist(ipftrain[,1:168], ipftest[,1:168])
+    dist <- ipfDist(ipftrain[,1:168], ipftest[,1:168])
 
-    ipfDist(ipftrain, ipftest, subset = seq(1,168))
+    dist <- ipfDist(ipftrain, ipftest, subset = seq(1,168))
 
-    ipfDist(ipftrain, ipftest, subset = c('LONGITUDE', 'LATITUDE'), method = 'manhattan')
+    dist <- ipfDist(ipftrain, ipftest, subset = c('LONGITUDE', 'LATITUDE'), method = 'manhattan')
 
 }
-

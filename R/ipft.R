@@ -37,7 +37,7 @@ ipfModel <- setClass(
   "ipfModel",
 
   slots = c(
-    neighbours = "matrix",
+    neighbors = "matrix",
     weights = "matrix",
     distances = "matrix",
     k = "numeric",
@@ -81,11 +81,11 @@ GRIDSIZE <- 5
 #'     test observations to train observations
 #'
 #' @examples
-#'     ipfDist(ipftrain[,1:168], ipftest[,1:168])
+#'     dist <- ipfDist(ipftrain[,1:168], ipftest[,1:168])
 #'
-#'     ipfDist(ipftrain, ipftest, subset = seq(1,168))
+#'     dist <- ipfDist(ipftrain, ipftest, subset = seq(1,168))
 #'
-#'     ipfDist(ipftrain, ipftest, subset = c('LONGITUDE', 'LATITUDE'), method = 'manhattan')
+#'     dist <- ipfDist(ipftrain, ipftest, subset = c('LONGITUDE', 'LATITUDE'), method = 'manhattan')
 #'
 #' @useDynLib ipft
 #' @importFrom Rcpp sourceCpp
@@ -115,7 +115,7 @@ ipfDist <- function(train, test, method = 'euclidean', subset = NULL, norm = 2,
 
 #' Transform function
 #'
-#' This function transforms the RSSI data to positive
+#' This function transforms the RSSI (Received Signal Strength Intensity) data to positive
 #' or exponential values
 #'
 #' @param data    a vector, matrix or data frame containing the RSSI vectors
@@ -168,11 +168,11 @@ ipfTransform <- function(data, trans = 'positive', minRSSI = -104, maxRSSI = 0,
 #'
 #' @examples
 #'
-#'     ipfGroup(mtcars, cyl)
+#'     group <- ipfGroup(mtcars, cyl)
 #'
-#'     ipfGroup(mtcars, gear, carb)
+#'     group <- ipfGroup(mtcars, gear, carb)
 #'
-#'     ipfGroup(ipftrain, LONGITUDE, LATITUDE)
+#'     group <- ipfGroup(ipftrain, LONGITUDE, LATITUDE)
 #'
 #' @importFrom dplyr group_indices group_indices_
 #'
@@ -204,9 +204,10 @@ ipfGroup <- function(data, ...) {
 #'
 #' @examples
 #'
-#'     ipfCluster(head(ipftrain, 20)[, 169:170], k = 4)
+#'     clusters <- ipfCluster(head(ipftrain, 20)[, 169:170], k = 4)
 #'
-#'     ipfCluster(head(ipftrain[, grep('^wap', names(ipftrain))], 20), method = 'AP')$clusters
+#'     clusters <- ipfCluster(head(ipftrain[, grep('^wap', names(ipftrain))], 20),
+#'     method = 'AP')$clusters
 #'
 #' @importFrom stats kmeans
 #' @importFrom dplyr select
@@ -241,11 +242,11 @@ ipfCluster <- function(data, method = 'k-means', k = NULL, ...) {
   return (result)
 }
 
-#' This function implements the k-nearest neighbours algorithm
+#' This function implements the k-nearest neighbors algorithm
 #'
 #' @param train     a data frame containing the RSSI vectors of the training set
 #' @param test      a data frame containing the RSSI vectors of the test set
-#' @param k         the k parameter for knn algorithm (number of nearest neighbours)
+#' @param k         the k parameter for knn algorithm (number of nearest neighbors)
 #' @param method    the method to compute the distance between the RSSI vectors:
 #'                 'euclidean', 'manhattan', 'norm', 'LGD' or 'PLGD'
 #' @param norm      parameter for the 'norm' method
@@ -260,8 +261,8 @@ ipfCluster <- function(data, method = 'k-means', k = NULL, ...) {
 #' @param ...       additional parameters for provided function FUN
 #'
 #' @return          An S4 class object of type ipfModel, with the following slots:
-#'                  neighbours -> a matrix with k columns and nrow(test) rows, with the
-#'                                k nearest neighbours for each test observation
+#'                  neighbors -> a matrix with k columns and nrow(test) rows, with the
+#'                                k nearest neighbors for each test observation
 #'                  weights ->    a matrix with k columns and nrow(test) rows, with the
 #'                                weight for each neighbour
 #'                  distances ->  a matrix with k columns and nrow(test) rows, with the
@@ -303,7 +304,7 @@ ipfKnn <- function(train, test, k = 3, method = 'euclidean', norm = 2, sd = 5,
     w <- (1 / (1 + dm[i, ne[i,]]))
     ws[i,] <- w / sum(w)
   }
-  return(ipfModel(neighbours = ne, weights = ws, distances = dm, k = k, groups = seq(1, nr)))
+  return(ipfModel(neighbors = ne, weights = ws, distances = dm, k = k, groups = seq(1, nr)))
 }
 
 #' This function implements a probabilistic algorithm
@@ -312,7 +313,7 @@ ipfKnn <- function(train, test, k = 3, method = 'euclidean', norm = 2, sd = 5,
 #' @param test      a data frame containing the RSSI vectors of the test set
 #' @param groups    a numeric vector of length = nrow(train) containing the group index
 #'                  for the training vectors
-#' @param k         the k parameter for the algorithm (number of similar neighbours)
+#' @param k         the k parameter for the algorithm (number of similar neighbors)
 #' @param FUN       function to compute the similarity measurement. Default is 'sum'
 #' @param delta     parameter delta
 #' @param ...       additional parameters for provided function FUN
@@ -320,7 +321,7 @@ ipfKnn <- function(train, test, k = 3, method = 'euclidean', norm = 2, sd = 5,
 #' @importFrom dplyr group_by summarise_each arrange "%>%" funs
 #'
 #' @return          An S4 class object of type ipfModel, with the following slots:
-#'                  neighbours -> a matrix with k columns and nrow(test) rows, with the
+#'                  neighbors -> a matrix with k columns and nrow(test) rows, with the
 #'                                k most similar training observation for each test observation
 #'                  weights ->    a matrix with k columns and nrow(test) rows, with the weights
 #'                  distances ->  a matrix with k columns and nrow(test) rows, with the distances
@@ -384,7 +385,7 @@ ipfProb <- function(train, test, groups, k = 3, FUN = sum, delta = 1, ...) {
     w <- sim[i, ne[i,]]
     ws[i,] <- w / sum(w)
   }
-  return(ipfModel(neighbours = ne, weights = ws, k = k, groups = groups))
+  return(ipfModel(neighbors = ne, weights = ws, k = k, groups = groups))
 }
 
 #' This function estimates the location of the test observations
@@ -414,7 +415,7 @@ ipfProb <- function(train, test, groups, k = 3, FUN = sum, delta = 1, ...) {
 #' @export
 ipfEstimate <- function(ipfmodel, locdata, loctest = NULL) {
   if (class(ipfmodel) != 'ipfModel') {stop("Wrong parameter type for wfmodel.")}
-  mloc <- matrix(0, nrow(ipfmodel@neighbours), 2)
+  mloc <- matrix(0, nrow(ipfmodel@neighbors), 2)
   grouploc <- as.matrix(locdata)
   GROUP <- NULL    # To avoid 'no visible binding for global variable' NOTE
 
@@ -426,8 +427,8 @@ ipfEstimate <- function(ipfmodel, locdata, loctest = NULL) {
     locdata <- as.data.frame(locdata)
   }
 
-  mloc[, 1] <- rowSums(locdata[ipfmodel@neighbours, 1] * ipfmodel@weights)
-  mloc[, 2] <- rowSums(locdata[ipfmodel@neighbours, 2] * ipfmodel@weights)
+  mloc[, 1] <- rowSums(locdata[ipfmodel@neighbors, 1] * ipfmodel@weights)
+  mloc[, 2] <- rowSums(locdata[ipfmodel@neighbors, 2] * ipfmodel@weights)
   errors <- c()
   if (!is.null(loctest)) {
     errors <- sqrt((mloc[, 1] - loctest[, 1])^2 + (mloc[, 2] - loctest[, 2])^2)
@@ -737,7 +738,7 @@ ipfPlotEcdf <- function(estimation, xlab = 'error',
     tickroundup[[which(xmark <= 10^floor(log10(xmark)) * tickroundup)[[1]]]]
 
   ggplot(errors, aes(errors$ERRORS)) +
-    stat_ecdf(geom = "point", alpha = .25) +
+    stat_ecdf(geom = "line", alpha = .75) +
     geom_vline(aes(xintercept = median(errors$ERRORS), color="Median"), alpha = 0.5,
                linetype = "longdash", size = 1, show.legend = TRUE) +
     geom_vline(aes(xintercept = mean(errors$ERRORS), color="Mean"), alpha = 0.5,
@@ -864,7 +865,7 @@ ipfPlotLoc <- function(locdata, plabel = FALSE, reverseAxis = FALSE, xlab = NULL
 #' @param testloc         location of test observations
 #' @param observations    a numeric vector with the indices of estimations to plot
 #' @param reverseAxis     swaps axis
-#' @param showNeighbours  plot the k selected neighbours
+#' @param showneighbors   plot the k selected neighbors
 #' @param showLabels      shows labels
 #' @param xlab            x-axis label
 #' @param ylab            y-axis label
@@ -875,13 +876,13 @@ ipfPlotLoc <- function(locdata, plabel = FALSE, reverseAxis = FALSE, xlab = NULL
 #'     model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168])
 #'     estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
 #'     ipfPlotEst(model, estimation, ipftest[, 169:170], observations = seq(7,10),
-#'                showNeighbours = TRUE, reverseAxis = TRUE)
+#'                showneighbors = TRUE, reverseAxis = TRUE)
 #'
 #' @importFrom ggplot2 ggplot aes geom_point geom_segment geom_curve arrow unit
 #'
 #' @export
 ipfPlotEst <- function(model, estimation, testloc = NULL, observations = c(1),
-                       reverseAxis = FALSE, showNeighbours = FALSE, showLabels = FALSE,
+                       reverseAxis = FALSE, showneighbors = FALSE, showLabels = FALSE,
                        xlab = NULL, ylab = NULL, title = '') {
 
   ePoints <- as.data.frame(matrix(estimation@location[observations, ], length(observations), 2))
@@ -897,10 +898,10 @@ ipfPlotEst <- function(model, estimation, testloc = NULL, observations = c(1),
   p <- ggplot() + geom_point(data = ePoints, aes(x = ePoints[, 1],
                                                  y = ePoints[, 2]), size = 3, alpha = 0.5)
 
-  if (showNeighbours) {
+  if (showneighbors) {
     nPoints <- NULL
     for (i in 1:length(observations)) {
-      np <- as.data.frame(matrix(estimation@grouploc[model@neighbours[observations[i],], 2:3],
+      np <- as.data.frame(matrix(estimation@grouploc[model@neighbors[observations[i],], 2:3],
                                  model@k, 2))
       if (reverseAxis) {
         np <- np[,c(2, 1)]
