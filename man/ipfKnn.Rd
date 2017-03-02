@@ -30,7 +30,8 @@ ipfKnn(train, test, k = 3, method = "euclidean", norm = 2, sd = 5,
 \item{FUN}{an alternative function provided to compute the distance.
 This function must return a matrix of dimensions:
 nrow(test) x nrow(train), containing the distances from
-test observations to train observations}
+test observations to train observations. The two first parameters
+taken by the function must be train and test}
 
 \item{...}{additional parameters for provided function FUN}
 }
@@ -49,8 +50,6 @@ An S4 class object of type ipfModel, with the following slots:
 This function implements the k-nearest neighbors algorithm
 }
 \examples{
-
-    model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168])
 
     model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168], k = 9, method = 'manhattan')
 

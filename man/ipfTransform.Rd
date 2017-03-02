@@ -4,23 +4,24 @@
 \alias{ipfTransform}
 \title{Transform function}
 \usage{
-ipfTransform(data, trans = "positive", minRSSI = -104, maxRSSI = 0,
-  noRSSI = 0, alpha = 24)
+ipfTransform(data, inRange = c(-104, 0), outRange = c(0, 100),
+  inNoRSSI = NA, outNoRSSI = 0, trans = "positive", base = 10)
 }
 \arguments{
 \item{data}{a vector, matrix or data frame containing the RSSI vectors}
 
-\item{trans}{the transformations to perform}
+\item{inRange}{a vector containing the range of the RSSI value from the
+initial data}
 
-\item{minRSSI}{the minimum value for RSSI to consider when transforming
-the RSSI to positive values.}
+\item{outRange}{the desired range for the output RSSI data.}
 
-\item{maxRSSI}{the maximum value for RSSI to consider when transforming
-the RSSI to exponential values.}
+\item{inNoRSSI}{value used in the RSSI data to represent a not detected AP.}
 
-\item{noRSSI}{value used in the RSSI data to represent a not detected AP.}
+\item{outNoRSSI}{value desired in the RSSI output data to represent a not detected AP.}
 
-\item{alpha}{parameter for exponential transformation}
+\item{trans}{the transformation to perform, 'linear' or 'exponential'}
+
+\item{base}{base for the 'exponential' transformation}
 }
 \value{
 This function returns a vector, matrix or data frame containing
@@ -32,10 +33,7 @@ or exponential values
 }
 \examples{
     trainRSSI <- ipftrain[,1:168]
-    ipfTransform(trainRSSI, trans = 'positive')
-
-    trainRSSI <- ipftrain[,1:168]
-    posTrainRSSI <- ipfTransform(trainRSSI, trans = 'positive')
-    expTrainRSSI <- ipfTransform(posTrainRSSI, trans = 'exponential', maxRSSI = 104)
+    ipfTransform(trainRSSI, inRange = c(-104, 0), outRange = c(1, 100),
+                 inNoRSSI = NA, outNoRSSI = 0)
 
 }

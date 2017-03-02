@@ -10,6 +10,9 @@ double lgd(NumericVector x, NumericVector y, double sd, double epsilon) {
   double t1 = 1 / (std::sqrt(2 * pi * std::pow(sd, 2)));
   double t2 = -1 / (2 * std::pow(sd, 2));
   for (int i = 0; i < x.length(); i++) {
+    if (R_IsNA(x[i]) || R_IsNA(y[i])) {
+      continue;
+    }
     if (x[i] != 0 && y[i] != 0) {
       g = t1 * std::exp(t2 * std::pow(x[i] - y[i], 2));
     } else {
@@ -28,6 +31,9 @@ double plgd(NumericVector x, NumericVector y, double sd, double epsilon, double 
   double pSum = 0;
   for (int i = 0; i < x.length(); i++) {
     p = 0;
+    if (R_IsNA(x[i]) || R_IsNA(y[i])) {
+      continue;
+    }
     if (x[i] != 0 && y[i] == 0) {
       if (x[i] > threshold) {
         p = x[i] - threshold;
@@ -45,7 +51,11 @@ double plgd(NumericVector x, NumericVector y, double sd, double epsilon, double 
 double norm(NumericVector x, NumericVector y, double normVal) {
   double d = 0;
   for (int i = 0; i < x.length(); i++) {
-    d = d + std::pow((x[i] - y[i]), normVal);
+    if (!R_IsNA(x[i]) && !R_IsNA(y[i])) {
+      d = d + std::pow((x[i] - y[i]), normVal);
+    }
+
+
   }
   return std::pow(d, 1 / normVal);
 }
@@ -53,7 +63,9 @@ double norm(NumericVector x, NumericVector y, double normVal) {
 double manhattan(NumericVector x, NumericVector y) {
   double d = 0;
   for (int i = 0; i < x.length(); i++) {
+    if (!R_IsNA(x[i]) && !R_IsNA(y[i])) {
       d = d + std::abs(x[i] - y[i]);
+    }
   }
   return d;
 }

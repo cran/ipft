@@ -83,8 +83,6 @@ GRIDSIZE <- 5
 #' @examples
 #'     dist <- ipfDist(ipftrain[,1:168], ipftest[,1:168])
 #'
-#'     dist <- ipfDist(ipftrain, ipftest, subset = seq(1,168))
-#'
 #'     dist <- ipfDist(ipftrain, ipftest, subset = c('LONGITUDE', 'LATITUDE'), method = 'manhattan')
 #'
 #' @useDynLib ipft
@@ -118,40 +116,69 @@ ipfDist <- function(train, test, method = 'euclidean', subset = NULL, norm = 2,
 #' This function transforms the RSSI (Received Signal Strength Intensity) data to positive
 #' or exponential values
 #'
-#' @param data    a vector, matrix or data frame containing the RSSI vectors
-#' @param trans   the transformations to perform
-#' @param minRSSI the minimum value for RSSI to consider when transforming
-#'                the RSSI to positive values.
-#' @param maxRSSI the maximum value for RSSI to consider when transforming
-#'                the RSSI to exponential values.
-#' @param noRSSI  value used in the RSSI data to represent a not detected AP.
-#' @param alpha   parameter for exponential transformation
+#' @param data      a vector, matrix or data frame containing the RSSI vectors
+#' @param inRange   a vector containing the range of the RSSI value from the
+#'                  initial data
+#' @param outRange  the desired range for the output RSSI data.
+#' @param inNoRSSI  value used in the RSSI data to represent a not detected AP.
+#' @param outNoRSSI value desired in the RSSI output data to represent a not detected AP.
+#' @param trans     the transformation to perform, 'linear' or 'exponential'
+#' @param base      base for the 'exponential' transformation
 #'
 #' @return This function returns a vector, matrix or data frame containing
 #'         the transformed data
 #'
 #' @examples
 #'     trainRSSI <- ipftrain[,1:168]
-#'     ipfTransform(trainRSSI, trans = 'positive')
-#'
-#'     trainRSSI <- ipftrain[,1:168]
-#'     posTrainRSSI <- ipfTransform(trainRSSI, trans = 'positive')
-#'     expTrainRSSI <- ipfTransform(posTrainRSSI, trans = 'exponential', maxRSSI = 104)
+#'     ipfTransform(trainRSSI, inRange = c(-104, 0), outRange = c(1, 100),
+#'                  inNoRSSI = NA, outNoRSSI = 0)
 #'
 #' @export
-ipfTransform <- function(data, trans = 'positive', minRSSI = -104, maxRSSI = 0,
-                         noRSSI = 0, alpha = 24) {
-  if (is.element('positive', trans)) {
-    if (minRSSI >= 0) {stop("minRSSI must be negative.")}
-    pdata <- data
-    pdata[data == noRSSI] <- 0
-    pdata[data != noRSSI] <- data[data != noRSSI] - minRSSI
-    data <- pdata
-  } else if (is.element('exponential', trans)) {
-    data[data != noRSSI] <- exp(data[data != noRSSI] / alpha) / exp(maxRSSI / alpha)
+ipfTransform <- function(data, inRange = c(-104, 0), outRange = c(0, 100),
+                         inNoRSSI = NA, outNoRSSI = 0, trans = 'positive', base = 10) {
+  tdata <- data
+  if (trans == 'positive') {
+    tdata[] <- lapply(data, trans_pos, imin = inRange[1], imax = inRange[2], omin = outRange[1],
+                     omax = outRange[2], ins = inNoRSSI, ons = outNoRSSI)
+  } else if (trans == 'exponential') {
+    tdata[] <- lapply(data, trans_exp, imin = inRange[1], imax = inRange[2], omin = outRange[1],
+                     omax = outRange[2], ins = inNoRSSI, ons = outNoRSSI, bs = base)
+  }
+  if (is.vector(data)) {
+    tdata <- unlist(tdata)
+  } else if (is.matrix(data)) {
+    tdata <- unlist(tdata)
+    dim(tdata) <- dim(data)
+  }
+  return (tdata)
+}
+
+trans_pos <- function(x, imin, imax, omin, omax, ins,  ons) {
+  if (is.na(ins)) {
+    nos <- is.na(x)
+  } else {
+    nos <- x == ins
   }
 
-  return (data)
+  m <- (omin - omax) / (imin - imax)
+  a <- omin - imin * m
+  x <- a + x * m
+  x[nos] <- ons
+  x
+}
+
+trans_exp <- function(x, imin, imax, omin, omax, ins, ons, bs) {
+  if (is.na(ins)) {
+    nos <- is.na(x)
+  } else {
+    nos <- x == ins
+  }
+
+  m <- (omin - omax) / (bs ^ imin - bs ^ imax)
+  a <- omax - (bs ^ imax) * m
+  x <- a + m * (bs ^x)
+  x[nos] <- ons
+  x
 }
 
 #' Creates groups based on the specified parameters
@@ -220,7 +247,7 @@ ipfCluster <- function(data, method = 'k-means', k = NULL, ...) {
 
   if (method == 'k-means') {
     if (!is.null(k)) {
-      kmn <- kmeans(data, k)
+      kmn <- kmeans(x = data, centers = k, ...)
     } else {
       stop("You must privide a value for k.")
     }
@@ -257,7 +284,8 @@ ipfCluster <- function(data, method = 'k-means', k = NULL, ...) {
 #' @param FUN       an alternative function provided to compute the distance.
 #'                  This function must return a matrix of dimensions:
 #'                  nrow(test) x nrow(train), containing the distances from
-#'                  test observations to train observations
+#'                  test observations to train observations. The two first parameters
+#'                  taken by the function must be train and test
 #' @param ...       additional parameters for provided function FUN
 #'
 #' @return          An S4 class object of type ipfModel, with the following slots:
@@ -271,8 +299,6 @@ ipfCluster <- function(data, method = 'k-means', k = NULL, ...) {
 #'                  groups ->     the group index for each training observation
 #'
 #' @examples
-#'
-#'     model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168])
 #'
 #'     model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168], k = 9, method = 'manhattan')
 #'
@@ -292,7 +318,7 @@ ipfKnn <- function(train, test, k = 3, method = 'euclidean', norm = 2, sd = 5,
   }
   train <- as.matrix(train)
   if (is.function(FUN)) {
-    dm <- FUN(...)
+    dm <- FUN(train, test, ...)
   } else {
     dm <- ipfDist(train = train, test = test, method = method, norm = norm, sd = sd,
                   epsilon = epsilon, alpha = alpha, threshold = threshold)
@@ -349,10 +375,14 @@ ipfProb <- function(train, test, groups, k = 3, FUN = sum, delta = 1, ...) {
 
   GROUP <- NULL
   sd <- NULL
+  meanNA <- function(x) mean(x, na.rm = TRUE)
+  sdNA <- function(x) sd(x, na.rm = TRUE)
 
   train$GROUP <- groups
-  tr_mn <- train %>% group_by(GROUP) %>% summarise_each(funs(mean)) %>% arrange(GROUP)
-  tr_sd <- train %>% group_by(GROUP) %>% summarise_each(funs(sd)) %>% arrange(GROUP)
+  tr_mn <- train %>% group_by(GROUP) %>% summarise_each(funs(meanNA)) %>% arrange(GROUP)
+  tr_sd <- train %>% group_by(GROUP) %>% summarise_each(funs(sdNA)) %>% arrange(GROUP)
+
+  #print(summary(tr_mn))
 
   tr_mn$GROUP <- NULL
   tr_sd$GROUP <- NULL
@@ -375,6 +405,7 @@ ipfProb <- function(train, test, groups, k = 3, FUN = sum, delta = 1, ...) {
 
       p[,i] <- (p1 - p2)
     }
+    p[is.na(p)] <- 0
     sim[, j] <- apply(p, 1, FUN, ...)
   }
 
@@ -647,11 +678,6 @@ rectAD <- function(L1, L2) {
 #'     estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
 #'     ipfPlotPdf(estimation)
 #'
-#'     groups <- ipfGroup(ipftrain, LONGITUDE, LATITUDE)
-#'     model <- ipfProb(ipftrain[, 1:168], ipftest[, 1:168], groups, k = 9, delta = 10)
-#'     estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
-#'     ipfPlotPdf(estimation, title = 'Probability density function')
-#'
 #' @importFrom ggplot2 ggplot aes geom_histogram geom_density geom_vline scale_color_manual
 #' @importFrom ggplot2 element_rect scale_alpha_manual scale_x_continuous labs theme
 #' @importFrom methods is
@@ -708,11 +734,6 @@ ipfPlotPdf <- function(estimation, xlab = 'error', ylab = 'density', title = '')
 #'     model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168])
 #'     estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
 #'     ipfPlotEcdf(estimation)
-#'
-#'     groups <- ipfGroup(ipftrain, LONGITUDE, LATITUDE)
-#'     model <- ipfProb(ipftrain[, 1:168], ipftest[, 1:168], groups, k = 9, delta = 10)
-#'     estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
-#'     ipfPlotEcdf(estimation, title = 'Error cumulative distribution function')
 #'
 #' @importFrom ggplot2 ggplot aes stat_ecdf geom_vline scale_color_manual
 #' @importFrom ggplot2 element_rect scale_alpha_manual scale_x_continuous labs theme
@@ -962,3 +983,46 @@ ipfPlotEst <- function(model, estimation, testloc = NULL, observations = c(1),
 
   p
 }
+
+
+#' ####################################
+#' #### version 2 #####################
+#' ####################################
+#' ipfAPLoc <- function(RSSIdata, locdata, k = 3, maxRSSI = -1, threshold = -104, mindist = 0) {
+#'   RSSIdata[RSSIdata > maxRSSI] <- NA
+#'   RSSIdata[RSSIdata < threshold] <- NA
+#'
+#'   locWAP <- matrix(0, ncol(RSSIdata), 2)
+#'   for (i in 1:ncol(RSSIdata)) {
+#'     m <- order(RSSIdata[, i], decreasing = TRUE)[1:k]
+#'     kRSSI <- abs((sum(RSSIdata[m, i]) - RSSIdata[m, i]) / sum(RSSIdata[m, i]))
+#'     kRSSI <- kRSSI / sum(kRSSI)
+#'     locWAP[i, 1] <- sum(locdata[m, 1] * kRSSI)
+#'     locWAP[i, 2] <- sum(locdata[m, 2] * kRSSI)
+#'   }
+#'
+#'
+#'   locWAP <- data.frame(locWAP, row.names = colnames(RSSIdata))
+#'   locWAP <- locWAP[complete.cases(locWAP),]
+#'   locWAP$wapGroupID <- 1:nrow(locWAP)
+#'   if (mindist > 0) {
+#'     cl <- ipfClD(locWAP, mindist)
+#'     for (i in 1:nrow(locWAP)) {
+#'       locWAP[i, ] <- cbind(cl$centroids[cl$clusters$clusterID[i], 1], cl$centroids[cl$clusters$clusterID[i], 2], cl$clusters$clusterID[i])
+#'     }
+#'   }
+#'
+#'   return (locWAP)
+#' }
+
+
+#' # Given a dataset and a distance, this function computes
+#' # the clusters of the dataset, calculates the mean RSSI for
+#' # all components of the cluster and returns a new dataset
+#' # with a row (of means and centroid) per cluster
+#' #' @importFrom leaderCluster leaderCluster
+#' ipfClD <- function(locdata, distance) {
+#'   cl <- leaderCluster(locdata, distance)
+#'   clusters <- data.frame(row = row.names(locdata), clusterID = cl$cluster_id)
+#'   return (list(clusters = clusters, centroids = cl$cluster_centroids))
+#' }

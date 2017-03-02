@@ -25,9 +25,4 @@ Plots the cumulative distribution function of the estimated error
     estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
     ipfPlotEcdf(estimation)
 
-    groups <- ipfGroup(ipftrain, LONGITUDE, LATITUDE)
-    model <- ipfProb(ipftrain[, 1:168], ipftest[, 1:168], groups, k = 9, delta = 10)
-    estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
-    ipfPlotEcdf(estimation, title = 'Error cumulative distribution function')
-
 }
