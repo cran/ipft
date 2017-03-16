@@ -2,7 +2,7 @@
 % Please edit documentation in R/ipft.R
 \name{ipfEstimate}
 \alias{ipfEstimate}
-\title{This function estimates the location of the test observations}
+\title{Estimates the location of the test observations}
 \usage{
 ipfEstimate(ipfmodel, locdata, loctest = NULL)
 }
@@ -20,7 +20,7 @@ An S4 class object of type ipfEstimation, with the following slots:
                 errors   ->   a numeric vector with the errors
 }
 \description{
-This function estimates the location of the test observations
+Estimates the location of the test observations
 }
 \examples{
 

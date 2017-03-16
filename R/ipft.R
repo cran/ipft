@@ -113,7 +113,7 @@ ipfDist <- function(train, test, method = 'euclidean', subset = NULL, norm = 2,
 
 #' Transform function
 #'
-#' This function transforms the RSSI (Received Signal Strength Intensity) data to positive
+#' Transforms the RSSI (Received Signal Strength Intensity) data to positive
 #' or exponential values
 #'
 #' @param data      a vector, matrix or data frame containing the RSSI vectors
@@ -130,14 +130,14 @@ ipfDist <- function(train, test, method = 'euclidean', subset = NULL, norm = 2,
 #'
 #' @examples
 #'     trainRSSI <- ipftrain[,1:168]
-#'     ipfTransform(trainRSSI, inRange = c(-104, 0), outRange = c(1, 100),
+#'     ipfTransform(trainRSSI, inRange = c(-100, 0), outRange = c(1, 100),
 #'                  inNoRSSI = NA, outNoRSSI = 0)
 #'
 #' @export
-ipfTransform <- function(data, inRange = c(-104, 0), outRange = c(0, 100),
-                         inNoRSSI = NA, outNoRSSI = 0, trans = 'positive', base = 10) {
+ipfTransform <- function(data, inRange = c(-100, 0), outRange = c(0, 100),
+                         inNoRSSI = NA, outNoRSSI = 0, trans = 'linear', base = 10) {
   tdata <- data
-  if (trans == 'positive') {
+  if (trans == 'linear') {
     tdata[] <- lapply(data, trans_pos, imin = inRange[1], imax = inRange[2], omin = outRange[1],
                      omax = outRange[2], ins = inNoRSSI, ons = outNoRSSI)
   } else if (trans == 'exponential') {
@@ -214,15 +214,17 @@ ipfGroup <- function(data, ...) {
 
 #' Creates clusters using the specified method
 #'
-#' This function creates clusters using the the specified method
+#' Creates clusters using the the specified method
 #' and assigns a cluster id to each cluster
 #'
 #' @param data   a data frame
 #' @param method the method to use to clusterize the data. Implemented
 #'               methods are:
 #'               'k-means' for k-means algorithm. Requires parameter k.
+#'               'grid' for clustering based on grid partition. Requires parameter grid.
 #'               'AP' for affinity propagation algorithm.
 #' @param k      parameter k
+#' @param grid   a vector with the grid size for the 'grid' method
 #' @param ...    additional parameters for apcluster and apclusterK
 #'
 #' @return       A list with:
@@ -242,7 +244,7 @@ ipfGroup <- function(data, ...) {
 #' @importFrom apcluster apclusterK apcluster negDistMat
 #'
 #' @export
-ipfCluster <- function(data, method = 'k-means', k = NULL, ...) {
+ipfCluster <- function(data, method = 'k-means', k = NULL, grid = NULL, ...) {
   result <- NULL
 
   if (method == 'k-means') {
@@ -263,13 +265,81 @@ ipfCluster <- function(data, method = 'k-means', k = NULL, ...) {
     }
     result <- list(clusters = as.numeric(as.factor(ap@idx)),
                    centers = data.frame(data[ap@exemplars,]))
+  } else if (method == 'grid') {
+    if (is.null(grid)) stop("You must privide a value for grid.")
+    if (ncol(data) != length(grid)) stop("The grid dimmensions must be equal to the data dimmensions.")
+    nacs <- apply(data, 2, function(x) all(is.na(x)))
+    data <- data[, !nacs]
+    grid <- grid[!nacs]
+    mins <- apply(data, 2, FUN = function(x) min(x, na.rm = TRUE))
+    maxs <- apply(data, 2, FUN = function(x) max(x, na.rm = TRUE))
+    dmns <- (maxs - mins) / grid
+
+    dimg <- sapply(seq_along(grid), function(i) round(1 + (data[,i] - mins[i]) / grid[i]))
+
+    dmgr <- length(grid)
+    gmtx <- matrix(1, nrow(data), dmgr)
+
+    for (i in 2:dmgr) {
+      gmtx[,i] <- gmtx[,i - 1] * dmns[i]
+    }
+
+    groups <- as.numeric(as.factor(rowSums(dimg * gmtx)))
+
+    centers <- matrix(0, length(unique(groups)), dmgr)
+
+    for (i in unique(groups)) {
+      centers[i, ] = colMeans(data[groups == i,])
+    }
+
+    centers <- data.frame(centers)
+    colnames(centers) <- colnames(data)
+    result <- list(clusters = groups, centers = centers)
   } else {
     stop("invalid method selected.")
   }
   return (result)
 }
 
-#' This function implements the k-nearest neighbors algorithm
+#' Estimates the positions of the access points
+#'
+#' @param dataRSSI    a data frame or a matrix with the RSSI fingerprints
+#' @param dataLOC     a data frame or a matrix with the location of the fingerprints
+#' @param method      method to use to estimate the position of the access points:
+#'                    'centroid', 'wcentroid' or 'wip'
+#' @param rssirange   a numeric vector with the range of the RSSI data
+#' @param norssi      value used in dataRSSI when an access point is not detected
+#'
+#' @examples
+#'
+#'     wapp <- ipfEstbp(ipftrain[, 1:168], ipftrain[, 169:170], method = 'wcentroid')
+#'
+#' @export
+ipfEstbp <- function(dataRSSI, dataLOC, method = 'wcentroid', rssirange = c(-100, 0), norssi = NA) {
+
+  tdata <- dataRSSI
+
+  if (method == 'wcentroid') {
+    tdata[] <- lapply(dataRSSI, trans_pos, imin = rssirange[1], imax = rssirange[2], omin = 0,
+                      omax = 1, ins = norssi, ons = 0)
+  } else if (method == 'centroid') {
+    tdata[] <- lapply(dataRSSI, function(x) x[x!=norssi] <- 1)
+  }
+
+  # Normalize
+  tdata[] <- lapply(tdata, function(x) x / sum(x))
+
+  aploc <- matrix(0, ncol(dataRSSI), ncol(dataLOC))
+  for (i in 1:ncol(dataRSSI)) {
+    aploc[i, 1] = sum(tdata[, i] * dataLOC[, 1])
+    aploc[i, 2] = sum(tdata[, i] * dataLOC[, 2])
+  }
+  aploc[is.nan(aploc)] <- NA
+  return (aploc)
+}
+
+
+#' Implements the k-nearest neighbors algorithm
 #'
 #' @param train     a data frame containing the RSSI vectors of the training set
 #' @param test      a data frame containing the RSSI vectors of the test set
@@ -419,7 +489,7 @@ ipfProb <- function(train, test, groups, k = 3, FUN = sum, delta = 1, ...) {
   return(ipfModel(neighbors = ne, weights = ws, k = k, groups = groups))
 }
 
-#' This function estimates the location of the test observations
+#' Estimates the location of the test observations
 #'
 #' @param ipfmodel an ipfModel
 #' @param locdata  a matrix or a data frame containing the position of the training set observations
@@ -466,6 +536,79 @@ ipfEstimate <- function(ipfmodel, locdata, loctest = NULL) {
   }
   return(ipfEstimation(location = mloc, grouploc = grouploc, errors = errors))
 }
+
+
+#' Estimates the position of the observations from its fingerprints and the access point location
+#' usins a logarithmic path loss model
+#'
+#' @param dataRSSI  a matrix or a data frame containing the RSSI data (fingerprints) of the
+#'                  observations
+#' @param wapLOC    a matrix or a data frame containing the position of the wireless access
+#'                  points, in the same order as they appear in dataRSSI
+#' @param locdata   a matrix or a data frame containing the position of the data set observations
+#' @param rssirange range of the RSSI data
+#' @param norssi    value used to represent a not detected AP
+#' @param alpha     path loss exponent
+#' @param wapPow1   detected RSSI at one meter range
+#'
+#' @return          An S4 class object of type ipfEstimation, with the following slots:
+#'                  location ->   a matrix with the predicted locations
+#'                  grouploc ->   NULL
+#'                  errors   ->   a numeric vector with the errors, if loctest has been provided
+#'
+#' @examples
+#'
+#'     ipfEst <- ipfProx(ipftrain[1:10, 1:168], ipfpwap, ipftrain[1:10, 169:170], alpha = 4)
+#'
+#' @importFrom methods new
+#'
+#' @export
+ipfProx <- function(dataRSSI, wapLOC, locdata = NULL, rssirange = c(-100, 0), norssi = NA,
+                    alpha = 5, wapPow1 = -30) {
+
+  if (ncol(dataRSSI) != nrow(wapLOC)) stop("Incorrect dimmensions.")
+  notNAs <-!as.logical(rowSums(is.na(wapLOC[,])))
+  dataRSSI <- dataRSSI[, notNAs]
+  wapLOC <- wapLOC[notNAs, ]
+
+  dataRSSI[]  <- lapply(dataRSSI, trans_pos, imin = rssirange[1], imax = rssirange[2],
+                        omin = 0, omax = 100, ins = norssi, ons = 0)
+
+  wP1 <- rep(trans_pos(x = wapPow1, imin = rssirange[1], imax = rssirange[2],
+                       omin = 0, omax = 100, ins = norssi, ons = 0), ncol(dataRSSI))
+
+  mloc <- t(sapply(1:nrow(dataRSSI), function(i) minim(fingerprint = dataRSSI[i, ],
+                                                       wapPos = wapLOC, wP1 = wP1,
+                                                       alpha = alpha)))
+
+  errors <- c()
+  if (!is.null(locdata)) {
+    errors <- sqrt((mloc[, 1] - locdata[, 1])^2 + (mloc[, 2] - locdata[, 2])^2)
+  }
+  return(ipfEstimation(location = mloc, grouploc = NULL, errors = errors))
+
+}
+
+
+#' @importFrom stats optim
+minim <- function(par, fingerprint, wapPos, wP1, alpha) {
+
+  # Escoger un punto inicial. El correspondiente al WAP con mayor señal.
+  par = wapPos[which.max(fingerprint),]
+
+  d1 <- 10 ^ ((wP1 - fingerprint)/ (10 * alpha))
+  sdd <- 4
+  sd <- (sdd * log(10) / (10 * alpha))
+  w <- 1 / (d1^2 * exp(sd ^ 2) * (exp(sd ^ 2) - 1))
+  optim(par = par, method = 'BFGS', fn = df, d1 = d1, wapPos = wapPos, w = w)$par
+}
+
+# Function to minimize to find position from fingerprint and WAPs position
+df <- function(pos, d1, wapPos, w) {
+  d2 <- apply(wapPos, 1, function(x) sqrt((x[1] - pos[1])^2 + (x[2] - pos[2])^2))
+  sum(sapply(1:ncol(d1), function(i) w[i] * (d1[,i] - d2[i])^2), na.rm = TRUE)
+}
+
 
 # AVERAGE NUMBER OF WAPS PER OBSERVATION
 rmce_getANW <- function(traindata) {
@@ -984,36 +1127,6 @@ ipfPlotEst <- function(model, estimation, testloc = NULL, observations = c(1),
   p
 }
 
-
-#' ####################################
-#' #### version 2 #####################
-#' ####################################
-#' ipfAPLoc <- function(RSSIdata, locdata, k = 3, maxRSSI = -1, threshold = -104, mindist = 0) {
-#'   RSSIdata[RSSIdata > maxRSSI] <- NA
-#'   RSSIdata[RSSIdata < threshold] <- NA
-#'
-#'   locWAP <- matrix(0, ncol(RSSIdata), 2)
-#'   for (i in 1:ncol(RSSIdata)) {
-#'     m <- order(RSSIdata[, i], decreasing = TRUE)[1:k]
-#'     kRSSI <- abs((sum(RSSIdata[m, i]) - RSSIdata[m, i]) / sum(RSSIdata[m, i]))
-#'     kRSSI <- kRSSI / sum(kRSSI)
-#'     locWAP[i, 1] <- sum(locdata[m, 1] * kRSSI)
-#'     locWAP[i, 2] <- sum(locdata[m, 2] * kRSSI)
-#'   }
-#'
-#'
-#'   locWAP <- data.frame(locWAP, row.names = colnames(RSSIdata))
-#'   locWAP <- locWAP[complete.cases(locWAP),]
-#'   locWAP$wapGroupID <- 1:nrow(locWAP)
-#'   if (mindist > 0) {
-#'     cl <- ipfClD(locWAP, mindist)
-#'     for (i in 1:nrow(locWAP)) {
-#'       locWAP[i, ] <- cbind(cl$centroids[cl$clusters$clusterID[i], 1], cl$centroids[cl$clusters$clusterID[i], 2], cl$clusters$clusterID[i])
-#'     }
-#'   }
-#'
-#'   return (locWAP)
-#' }
 
 
 #' # Given a dataset and a distance, this function computes

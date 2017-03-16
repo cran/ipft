@@ -4,8 +4,8 @@
 \alias{ipfTransform}
 \title{Transform function}
 \usage{
-ipfTransform(data, inRange = c(-104, 0), outRange = c(0, 100),
-  inNoRSSI = NA, outNoRSSI = 0, trans = "positive", base = 10)
+ipfTransform(data, inRange = c(-100, 0), outRange = c(0, 100),
+  inNoRSSI = NA, outNoRSSI = 0, trans = "linear", base = 10)
 }
 \arguments{
 \item{data}{a vector, matrix or data frame containing the RSSI vectors}
@@ -28,12 +28,12 @@ This function returns a vector, matrix or data frame containing
         the transformed data
 }
 \description{
-This function transforms the RSSI (Received Signal Strength Intensity) data to positive
+Transforms the RSSI (Received Signal Strength Intensity) data to positive
 or exponential values
 }
 \examples{
     trainRSSI <- ipftrain[,1:168]
-    ipfTransform(trainRSSI, inRange = c(-104, 0), outRange = c(1, 100),
+    ipfTransform(trainRSSI, inRange = c(-100, 0), outRange = c(1, 100),
                  inNoRSSI = NA, outNoRSSI = 0)
 
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/ipft.R
 \name{ipfKnn}
 \alias{ipfKnn}
-\title{This function implements the k-nearest neighbors algorithm}
+\title{Implements the k-nearest neighbors algorithm}
 \usage{
 ipfKnn(train, test, k = 3, method = "euclidean", norm = 2, sd = 5,
   epsilon = 0.001, alpha = 1, threshold = 20, FUN = NULL, ...)
@@ -47,7 +47,7 @@ An S4 class object of type ipfModel, with the following slots:
                  groups ->     the group index for each training observation
 }
 \description{
-This function implements the k-nearest neighbors algorithm
+Implements the k-nearest neighbors algorithm
 }
 \examples{
 

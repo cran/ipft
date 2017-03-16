@@ -4,7 +4,7 @@
 \alias{ipfCluster}
 \title{Creates clusters using the specified method}
 \usage{
-ipfCluster(data, method = "k-means", k = NULL, ...)
+ipfCluster(data, method = "k-means", k = NULL, grid = NULL, ...)
 }
 \arguments{
 \item{data}{a data frame}
@@ -12,9 +12,12 @@ ipfCluster(data, method = "k-means", k = NULL, ...)
 \item{method}{the method to use to clusterize the data. Implemented
 methods are:
 'k-means' for k-means algorithm. Requires parameter k.
+'grid' for clustering based on grid partition. Requires parameter grid.
 'AP' for affinity propagation algorithm.}
 
 \item{k}{parameter k}
+
+\item{grid}{a vector with the grid size for the 'grid' method}
 
 \item{...}{additional parameters for apcluster and apclusterK}
 }
@@ -24,7 +27,7 @@ A list with:
                  centers  -> a data frame with the centers of the clusters
 }
 \description{
-This function creates clusters using the the specified method
+Creates clusters using the the specified method
 and assigns a cluster id to each cluster
 }
 \examples{

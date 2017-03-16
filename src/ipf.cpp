@@ -54,8 +54,6 @@ double norm(NumericVector x, NumericVector y, double normVal) {
     if (!R_IsNA(x[i]) && !R_IsNA(y[i])) {
       d = d + std::pow((x[i] - y[i]), normVal);
     }
-
-
   }
   return std::pow(d, 1 / normVal);
 }
