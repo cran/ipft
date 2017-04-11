@@ -5,7 +5,8 @@
 \title{Plots the cumulative distribution function of the estimated error}
 \usage{
 ipfPlotEcdf(estimation, xlab = "error",
-  ylab = "cumulative density of error", title = "")
+  ylab = "cumulative density of error",
+  title = "Empirical cumulative density function")
 }
 \arguments{
 \item{estimation}{an ipfEstimation}
@@ -21,8 +22,8 @@ Plots the cumulative distribution function of the estimated error
 }
 \examples{
 
-    model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168])
-    estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
+    model <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170])
+    estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
     ipfPlotEcdf(estimation)
 
 }

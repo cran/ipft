@@ -1,34 +1,35 @@
 ## Rcpp::sourceCpp(normalizePath(file.path(".", "src", "ipf.cpp")))
 
-setClassUnion("numericOrNULL",members=c("numeric", "NULL"))
-setClassUnion("matrixOrNULL",members=c("matrix", "NULL"))
+setClassUnion("numericOrNULL", members=c("numeric", "NULL"))
+setClassUnion("matrixOrNULL",  members=c("matrix", "NULL"))
+setClassUnion("listOrNULL",  members=c("list", "NULL"))
 
 rmdata <- setClass(
   "rmdata",
 
   slots = c(
-    NP  = "numeric",
-    NG  = "numeric",
-    ADP = "numeric",
-    ADG = "numeric",
-    AAD = "numeric",
-    W   = "numeric",
-    H   = "numeric",
-    ANW = "numeric",
-    AIW = "numeric",
-    MIW = "numeric",
+    NP   = "numeric",
+    NG   = "numeric",
+    ADP  = "numeric",
+    ADG  = "numeric",
+    AAD  = "numeric",
+    W    = "numeric",
+    H    = "numeric",
+    ANW  = "numeric",
+    AIW  = "numeric",
+    MIW  = "numeric",
     SDIW = "numeric",
     SDNW = "numeric",
 
-    anppc = "numeric",
-    angpc = "numeric",
+    anppc  = "numeric",
+    angpc  = "numeric",
     sdnppc = "numeric",
     sdngpc = "numeric",
-    anwpc = "numeric",
+    anwpc  = "numeric",
     sdnwpc = "numeric",
-    aiwpc = "numeric",
+    aiwpc  = "numeric",
     sdiwpc = "numeric",
-    area = "numeric"
+    area   = "numeric"
 
   )
 )
@@ -37,11 +38,8 @@ ipfModel <- setClass(
   "ipfModel",
 
   slots = c(
-    neighbors = "matrix",
-    weights = "matrix",
-    distances = "matrix",
-    k = "numeric",
-    groups = "numeric"
+    params = "list",
+    data   = "list"
   )
 )
 
@@ -49,9 +47,11 @@ ipfEstimation <- setClass(
   "ipfEstimation",
 
   slots = c(
-    location = "matrix",
-    grouploc = "matrixOrNULL",
-    errors = "numericOrNULL"
+    location  = "data.frame",
+    errors    = "numericOrNULL",
+    confusion = "listOrNULL",
+    neighbors = "matrixOrNULL",
+    weights   = "matrixOrNULL"
   )
 )
 
@@ -93,19 +93,19 @@ ipfDist <- function(train, test, method = 'euclidean', subset = NULL, norm = 2,
                     sd = 10, epsilon = 1e-30, alpha = 20, threshold = 20) {
   if (is.null(subset)) {
     m_train <- as.matrix(train)
-    m_test <- as.matrix(test)
+    m_test  <- as.matrix(test)
   } else {
     m_train <- as.matrix(train[, subset])
-    m_test <- as.matrix(test[, subset])
+    m_test  <- as.matrix(test[, subset])
   }
   if (ncol(m_train) == 1) {m_train <- t(m_train)}
   if (ncol(m_test) == 1) {m_test <- t(m_test)}
   switch(method,
          'euclidean' = dist <- ipfEuclidean(m_train, m_test),
          'manhattan' = dist <- ipfManhattan(m_train, m_test),
-         'norm' = dist <- ipfNormDistance(m_train, m_test, norm),
-         'LGD' = dist <- ipfLGD(m_train, m_test, sd, epsilon),
-         'PLGD' = dist <- ipfPLGD(m_train, m_test, sd, epsilon, alpha, threshold),
+         'norm'      = dist <- ipfNormDistance(m_train, m_test, norm),
+         'LGD'       = dist <- ipfLGD(m_train, m_test, sd, epsilon),
+         'PLGD'      = dist <- ipfPLGD(m_train, m_test, sd, epsilon, alpha, threshold),
          stop("invalid distance method.")
          )
   return (dist)
@@ -303,36 +303,37 @@ ipfCluster <- function(data, method = 'k-means', k = NULL, grid = NULL, ...) {
 
 #' Estimates the positions of the access points
 #'
-#' @param dataRSSI    a data frame or a matrix with the RSSI fingerprints
-#' @param dataLOC     a data frame or a matrix with the location of the fingerprints
-#' @param method      method to use to estimate the position of the access points:
-#'                    'centroid', 'wcentroid' or 'wip'
-#' @param rssirange   a numeric vector with the range of the RSSI data
-#' @param norssi      value used in dataRSSI when an access point is not detected
+#' @param fingerprints a data frame or a matrix with the RSSI fingerprints
+#' @param positions    a data frame or a matrix with the positions of the fingerprints
+#' @param method       method to use to estimate the position of the access points:
+#'                     'centroid', 'wcentroid' or 'wip'
+#' @param rssirange    a numeric vector with the range of the RSSI data
+#' @param norssi       value used in dataRSSI when an access point is not detected
 #'
 #' @examples
 #'
 #'     wapp <- ipfEstbp(ipftrain[, 1:168], ipftrain[, 169:170], method = 'wcentroid')
 #'
 #' @export
-ipfEstbp <- function(dataRSSI, dataLOC, method = 'wcentroid', rssirange = c(-100, 0), norssi = NA) {
+ipfEstbp <- function(fingerprints, positions, method = 'wcentroid', rssirange = c(-100, 0),
+                     norssi = NA) {
 
-  tdata <- dataRSSI
+  tdata <- fingerprints
 
   if (method == 'wcentroid') {
-    tdata[] <- lapply(dataRSSI, trans_pos, imin = rssirange[1], imax = rssirange[2], omin = 0,
-                      omax = 1, ins = norssi, ons = 0)
+    tdata[] <- lapply(fingerprints, ipfTransform, inRange = rssirange, outRange = c(0, 1),
+                      inNoRSSI = norssi, outNoRSSI = 0)
   } else if (method == 'centroid') {
-    tdata[] <- lapply(dataRSSI, function(x) x[x!=norssi] <- 1)
+    tdata[] <- lapply(fingerprints, function(x) x[x!=norssi] <- 1)
   }
 
   # Normalize
   tdata[] <- lapply(tdata, function(x) x / sum(x))
 
-  aploc <- matrix(0, ncol(dataRSSI), ncol(dataLOC))
-  for (i in 1:ncol(dataRSSI)) {
-    aploc[i, 1] = sum(tdata[, i] * dataLOC[, 1])
-    aploc[i, 2] = sum(tdata[, i] * dataLOC[, 2])
+  aploc <- matrix(0, ncol(fingerprints), ncol(positions))
+  for (i in 1:ncol(fingerprints)) {
+    aploc[i, 1] = sum(tdata[, i] * positions[, 1])
+    aploc[i, 2] = sum(tdata[, i] * positions[, 2])
   }
   aploc[is.nan(aploc)] <- NA
   return (aploc)
@@ -341,11 +342,12 @@ ipfEstbp <- function(dataRSSI, dataLOC, method = 'wcentroid', rssirange = c(-100
 
 #' Implements the k-nearest neighbors algorithm
 #'
-#' @param train     a data frame containing the RSSI vectors of the training set
-#' @param test      a data frame containing the RSSI vectors of the test set
+#' @param train_fgp a data frame containing the fingerprint vectors of the training set
+#' @param train_pos a data frame containing the positions of the training set observations
 #' @param k         the k parameter for knn algorithm (number of nearest neighbors)
 #' @param method    the method to compute the distance between the RSSI vectors:
 #'                 'euclidean', 'manhattan', 'norm', 'LGD' or 'PLGD'
+#' @param weights   the algorithm to compute the weights: 'distance' or 'uniform'
 #' @param norm      parameter for the 'norm' method
 #' @param sd        parameter for 'LGD' and 'PLGD' methods
 #' @param epsilon   parameter for 'LGD' and 'PLGD' methods
@@ -359,116 +361,171 @@ ipfEstbp <- function(dataRSSI, dataLOC, method = 'wcentroid', rssirange = c(-100
 #' @param ...       additional parameters for provided function FUN
 #'
 #' @return          An S4 class object of type ipfModel, with the following slots:
-#'                  neighbors -> a matrix with k columns and nrow(test) rows, with the
-#'                                k nearest neighbors for each test observation
-#'                  weights ->    a matrix with k columns and nrow(test) rows, with the
-#'                                weight for each neighbour
-#'                  distances ->  a matrix with k columns and nrow(test) rows, with the
-#'                                distances between test and each neighbour
-#'                  k ->          k parameter
-#'                  groups ->     the group index for each training observation
+#'                  params ->     a list with the parameters passed to the function
+#'                  data   ->     a list with the fingerprints and locations
 #'
 #' @examples
 #'
-#'     model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168], k = 9, method = 'manhattan')
+#'     model <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170], k = 9, method = 'manhattan')
 #'
 #' @importFrom methods new
 #'
 #' @export
-ipfKnn <- function(train, test, k = 3, method = 'euclidean', norm = 2, sd = 5,
-                   epsilon = 1e-3, alpha = 1, threshold = 20, FUN = NULL, ...) {
-  nr <- nrow(train)
-  nt <- nrow(test)
+ipfKnn <- function(train_fgp, train_pos, k = 3, method = 'euclidean', weights = 'distance',
+                   norm = 2, sd = 5, epsilon = 1e-3, alpha = 1, threshold = 20, FUN = NULL, ...) {
+  nr <- nrow(train_fgp)
   if (nr < k) stop("k can not be greater than the number of rows in training set")
 
-  if (is.atomic(test)) {
-    test <- matrix(test, nrow = 1)
-  } else {
-    test <- as.matrix(test)
+  extra_params <- NULL
+  if (!missing(..0)) {
+    extra_params = list(...)
   }
-  train <- as.matrix(train)
-  if (is.function(FUN)) {
-    dm <- FUN(train, test, ...)
+
+  return(ipfModel(params = list(name = 'knn',
+                                k = k,
+                                method = method,
+                                norm = norm,
+                                weights = weights,
+                                sd = sd,
+                                epsilon = epsilon,
+                                alpha = alpha,
+                                threshold = threshold,
+                                FUN = FUN,
+                                extra_params = extra_params),
+                  data   = list(fingerprints = as.data.frame(train_fgp),
+                                positions = as.data.frame(train_pos))))
+}
+
+knn <- function(tr_fgp, ts_fgp, k = 3, method = 'euclidean', weights = 'distance', norm = 2, sd = 5,
+                epsilon = 1e-3, alpha = 1, threshold = 20, FUN = NULL, ...) {
+
+  if (is.atomic(ts_fgp)) {
+    ts_fgp <- matrix(ts_fgp, nrow = 1)
   } else {
-    dm <- ipfDist(train = train, test = test, method = method, norm = norm, sd = sd,
+    ts_fgp <- as.matrix(ts_fgp)
+  }
+  tr_fgp <- as.matrix(tr_fgp)
+  if (is.function(FUN)) {
+    if (missing(..0)) {
+      dm <- FUN(tr_fgp, ts_fgp)
+    } else {
+      dm <- FUN(tr_fgp, ts_fgp, ...)
+    }
+  } else {
+    dm <- ipfDist(train = tr_fgp, test = ts_fgp, method = method, norm = norm, sd = sd,
                   epsilon = epsilon, alpha = alpha, threshold = threshold)
   }
-  ne <- matrix(0, nrow = nt, ncol = k)
-  ws <- matrix(0, nrow = nt, ncol = k)
-  for (i in 1:nt) {
+  ne <- matrix(0, nrow = nrow(ts_fgp), ncol = k)
+  ws <- matrix(0, nrow = nrow(ts_fgp), ncol = k)
+  for (i in 1:nrow(ts_fgp)) {
     ne[i,] <- order(dm[i, ])[1:k]
-    w <- (1 / (1 + dm[i, ne[i,]]))
-    ws[i,] <- w / sum(w)
+    if (weights == 'distance') {
+      w <- (1 / (1 + dm[i, ne[i,]]))
+      ws[i,] <- w / sum(w)
+    } else if (weights == 'uniform') {
+      ws[i,] <- 1 / k
+    }
   }
-  return(ipfModel(neighbors = ne, weights = ws, distances = dm, k = k, groups = seq(1, nr)))
+  return(list(neighbors = ne, weights = ws))
 }
 
 #' This function implements a probabilistic algorithm
 #'
-#' @param train     a data frame containing the RSSI vectors of the training set
-#' @param test      a data frame containing the RSSI vectors of the test set
-#' @param groups    a numeric vector of length = nrow(train) containing the group index
-#'                  for the training vectors
-#' @param k         the k parameter for the algorithm (number of similar neighbors)
-#' @param FUN       function to compute the similarity measurement. Default is 'sum'
-#' @param delta     parameter delta
-#' @param ...       additional parameters for provided function FUN
+#' @param train_fgp  a data frame containing the fingerprint vectors of the training set
+#' @param train_pos  a data frame containing the positions of the training set observations
+#' @param group_cols a character vector with the names of the columns to be used as the criteria
+#'                   to group the fingerprints. By default the groups will be created using all
+#'                   the columns available in the train_pos data frame.
+#' @param groups     a numeric vector of length = nrow(train) containing the group index
+#'                   for the training vectors
+#' @param k          the k parameter for the algorithm (number of similar neighbors)
+#' @param FUN        function to compute the similarity measurement. Default is 'sum'
+#' @param delta      parameter delta
+#' @param ...        additional parameters for provided function FUN
 #'
 #' @importFrom dplyr group_by summarise_each arrange "%>%" funs
 #'
 #' @return          An S4 class object of type ipfModel, with the following slots:
-#'                  neighbors -> a matrix with k columns and nrow(test) rows, with the
-#'                                k most similar training observation for each test observation
-#'                  weights ->    a matrix with k columns and nrow(test) rows, with the weights
-#'                  distances ->  a matrix with k columns and nrow(test) rows, with the distances
-#'                  k ->          k parameter
-#'                  groups ->     the group index for each training observation
+#'                  params ->     a list with the parameters passed to the function
+#'                  data   ->     a list with the fingerprints probabilistic parameters
+#'                                (means and standard deviations) and its locations
 #'
 #' @examples
 #'
 #'     groups <- ipfGroup(ipftrain, LONGITUDE, LATITUDE)
-#'     model <- ipfProb(ipftrain[, 1:168], ipftest[, 1:168], groups)
+#'     model <- ipfProb(ipftrain[, 1:168], ipftrain[, 169:170], groups = groups)
 #'
-#'     groups <- ipfGroup(ipftrain, LONGITUDE, LATITUDE)
-#'     model <- ipfProb(ipftrain[, 1:168], ipftest[, 1:168], groups, k = 9, delta = 10)
+#'\dontrun{
+#'     model <- ipfProb(ipftrain[, 1:168], ipftrain[, 169:170], k = 9, delta = 10)
+#' }
 #'
 #' @importFrom methods new
 #'
 #' @export
-ipfProb <- function(train, test, groups, k = 3, FUN = sum, delta = 1, ...) {
-  if (ncol(train) != ncol(test)) {
-    stop("Training and test datasets must have the same number of columns.")
+ipfProb <- function(train_fgp, train_pos, group_cols = NULL, groups = NULL, k = 3,
+                    FUN = sum, delta = 1, ...) {
+  if (nrow(train_fgp) != nrow(train_pos)) {
+    stop("train_fgp and train_pos must have the same number of rows")
   }
-  if (nrow(train) != length(groups)) {
-    stop("Incorrect dimmension of groups. Should be equal to nrow(train).")
+  if (!is.null(groups) && (nrow(train_fgp) != length(groups))) {
+    stop("Incorrect dimmension of groups. Should be equal to the number of training fingerprints.")
   }
 
   GROUP <- NULL
   sd <- NULL
   meanNA <- function(x) mean(x, na.rm = TRUE)
+  fPos <- function(x) if (!is.factor(x)) mean(x, na.rm = TRUE) else x[1]
   sdNA <- function(x) sd(x, na.rm = TRUE)
 
-  train$GROUP <- groups
-  tr_mn <- train %>% group_by(GROUP) %>% summarise_each(funs(meanNA)) %>% arrange(GROUP)
-  tr_sd <- train %>% group_by(GROUP) %>% summarise_each(funs(sdNA)) %>% arrange(GROUP)
+  if (is.null(groups)) {
+    if (is.null(group_cols)) {
+      groups <- ipfGroup(train_pos)
+    } else {
+      groups <- group_indices_(cbind(train_fgp, train_pos), .dots = group_cols)
+    }
+  }
+  train_fgp$GROUP <- groups
+  train_pos$GROUP <- groups
+  tr_mns <- train_fgp %>% group_by(GROUP) %>% summarise_each(funs(meanNA)) %>% arrange(GROUP)
+  tr_sds <- train_fgp %>% group_by(GROUP) %>% summarise_each(funs(sdNA))   %>% arrange(GROUP)
+  tr_pos <- train_pos %>% group_by(GROUP) %>% summarise_each(funs(fPos)) %>% arrange(GROUP)
 
-  #print(summary(tr_mn))
+  tr_mns$GROUP <- NULL
+  tr_sds$GROUP <- NULL
+  tr_pos$GROUP <- NULL
 
-  tr_mn$GROUP <- NULL
-  tr_sd$GROUP <- NULL
+  tr_mns[is.na(tr_mns)] <- NA  # NaN to NA
 
-  nr <- nrow(tr_mn)
-  nc <- ncol(tr_mn)
+  extra_params <- NULL
+  if (!missing(..0)) {
+    extra_params = list(...)
+  }
+
+  return(ipfModel(params = list(name = 'prob',
+                                k = k,
+                                FUN = FUN,
+                                delta = delta,
+                                extra_params = extra_params),
+                  data   = list(means = as.data.frame(tr_mns),
+                                sds = as.data.frame(tr_sds),
+                                positions = as.data.frame(tr_pos))))
+}
+
+prob <- function(tr_mns, tr_sds, ts_fgp, k = 3, FUN = sum, delta = 1, ...) {
+
+  nr <- nrow(tr_mns)
+  nc <- ncol(tr_mns)
   if (nr < k) stop("k can not be greater than the number of rows in training set")
-  sim <- matrix(0, nrow(test), nr)
-  p <- matrix(0, nrow(test), nc)
+  sim <- matrix(0, nrow(ts_fgp), nr)
+  p <- matrix(0, nrow(ts_fgp), nc)
+
   for (j in 1:nr) {
-    m <- as.numeric(tr_mn[j, ])
-    s <- as.numeric(tr_sd[j, ])
+    m <- as.numeric(tr_mns[j, ])
+    s <- as.numeric(tr_sds[j, ])
 
     for (i in 1:nc) {
-      o1 <- test[, i] - delta
-      o2 <- test[, i] + delta
+      o1 <- ts_fgp[, i] - delta
+      o2 <- ts_fgp[, i] + delta
 
       p1 <- pnorm(o1, mean = m[i], sd = s[i], lower.tail = FALSE)
       p2 <- pnorm(o2, mean = m[i], sd = s[i], lower.tail = FALSE)
@@ -478,83 +535,172 @@ ipfProb <- function(train, test, groups, k = 3, FUN = sum, delta = 1, ...) {
     p[is.na(p)] <- 0
     sim[, j] <- apply(p, 1, FUN, ...)
   }
-
-  ne <- matrix(0, nrow = nrow(test), ncol = k)
-  ws <- matrix(0, nrow = nrow(test), ncol = k)
-  for (i in 1:nrow(test)) {
+  ne <- matrix(0, nrow = nrow(ts_fgp), ncol = k)
+  ws <- matrix(0, nrow = nrow(ts_fgp), ncol = k)
+  for (i in 1:nrow(ts_fgp)) {
     ne[i,] <- order(sim[i, ], decreasing = TRUE)[1:k]
     w <- sim[i, ne[i,]]
     ws[i,] <- w / sum(w)
   }
-  return(ipfModel(neighbors = ne, weights = ws, k = k, groups = groups))
+  return(list(neighbors = ne, weights = ws))
+
 }
 
 #' Estimates the location of the test observations
 #'
-#' @param ipfmodel an ipfModel
-#' @param locdata  a matrix or a data frame containing the position of the training set observations
-#' @param loctest  a matrix or a data frame containing the position of the test set observations
+#' @param ipfmodel  an ipfModel
+#' @param test_fgp  a matrix or a data frame containing the fingerprints of the test set
+#' @param test_pos  a matrix or a data frame containing the position of the test set fingerprints
 #'
 #' @return         An S4 class object of type ipfEstimation, with the following slots:
 #'                 location ->   a matrix with the predicted locations
-#'                 grouploc ->   a matrix with the location data for each group
 #'                 errors   ->   a numeric vector with the errors
+#'                 neighbors ->  a matrix with k columns and nrow(test) rows, with the
+#'                               k most similar training observation for each test observation
+#'                 weights ->    a matrix with k columns and nrow(test) rows, with the weights
 #'
 #' @examples
 #'
-#'     model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168])
-#'     estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
+#'     model <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170])
+#'     estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
 #'
-#'     groups <- ipfGroup(ipftrain, LONGITUDE, LATITUDE)
-#'     model <- ipfProb(ipftrain[, 1:168], ipftest[, 1:168], groups, k = 9, delta = 10)
-#'     estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
-#'
+#'\dontrun{
+#'     model <- ipfProb(ipftrain[, 1:168], ipftrain[, 169:170], k = 9, delta = 10)
+#'     estimation <- ipfEstimate(model, ipftest[, 1:170], ipftest[, 169:170])
+#' }
 #' @importFrom dplyr group_by summarise_each arrange "%>%" funs
 #'
 #' @importFrom methods new
 #'
 #' @export
-ipfEstimate <- function(ipfmodel, locdata, loctest = NULL) {
+ipfEstimate <- function(ipfmodel, test_fgp, test_pos = NULL) {
   if (class(ipfmodel) != 'ipfModel') {stop("Wrong parameter type for wfmodel.")}
-  mloc <- matrix(0, nrow(ipfmodel@neighbors), 2)
-  grouploc <- as.matrix(locdata)
-  GROUP <- NULL    # To avoid 'no visible binding for global variable' NOTE
 
-  if (!is.null(ipfmodel@groups)) {
-    locdata$GROUP <- ipfmodel@groups
-    locdata <- locdata %>% group_by(GROUP) %>% summarise_each(funs(mean)) %>% arrange(GROUP)
-    grouploc <- as.matrix(locdata)
-    locdata$GROUP <- NULL
-    locdata <- as.data.frame(locdata)
+  if (ipfmodel@params$name == 'prob') {
+    if (is.null(unlist(ipfmodel@params$extra_params))) {
+      est <- prob(
+        tr_mns = ipfmodel@data$means,
+        tr_sds = ipfmodel@data$sds,
+        ts_fgp = test_fgp,
+        k = ipfmodel@params$k,
+        FUN = ipfmodel@params$FUN,
+        delta = ipfmodel@params$delta)
+    } else {
+      est <- prob(
+        tr_mns = ipfmodel@data$means,
+        tr_sds = ipfmodel@data$sds,
+        ts_fgp = test_fgp,
+        k = ipfmodel@params$k,
+        FUN = ipfmodel@params$FUN,
+        delta = ipfmodel@params$delta,
+        unlist(ipfmodel@params$extra_params))
+    }
+
+  } else if (ipfmodel@params$name == 'knn') {
+    if (is.null(unlist(ipfmodel@params$extra_params))) {
+      est <- knn(
+        tr_fgp = ipfmodel@data$fingerprints,
+        ts_fgp = test_fgp,
+        k = ipfmodel@params$k,
+        method = ipfmodel@params$method,
+        weights = ipfmodel@params$weights,
+        norm = ipfmodel@params$norm,
+        sd = ipfmodel@params$sd,
+        epsilon = ipfmodel@params$epsilon,
+        alpha = ipfmodel@params$alpha,
+        threshold = ipfmodel@params$threshold,
+        FUN = ipfmodel@params$FUN)
+    } else {
+      est <- knn(
+        tr_fgp = ipfmodel@data$fingerprints,
+        ts_fgp = test_fgp,
+        k = ipfmodel@params$k,
+        method = ipfmodel@params$method,
+        weights = ipfmodel@params$weights,
+        norm = ipfmodel@params$norm,
+        sd = ipfmodel@params$sd,
+        epsilon = ipfmodel@params$epsilon,
+        alpha = ipfmodel@params$alpha,
+        threshold = ipfmodel@params$threshold,
+        FUN = ipfmodel@params$FUN,
+        unlist(ipfmodel@params$extra_params))
+    }
+  } else {
+    stop("Invalid model.")
   }
 
-  mloc[, 1] <- rowSums(locdata[ipfmodel@neighbors, 1] * ipfmodel@weights)
-  mloc[, 2] <- rowSums(locdata[ipfmodel@neighbors, 2] * ipfmodel@weights)
+  tr_pos <- ipfmodel@data$positions
+  if (!is.null(test_pos)) {
+    if (!is.data.frame(test_pos)) {
+      test_pos <- data.frame(test_pos)
+    }
+    test_pos <- data.frame(test_pos[1:nrow(test_fgp),])
+  }
+
+  col_errors <- rep(0, nrow(test_fgp))
+  mloc <- matrix(0, nrow(test_fgp), ncol(tr_pos))
+  mloc <- data.frame(mloc)
+
+  n_factors <- sum(sapply(tr_pos, function(x) is.factor(x)))
+  confusion <- vector('list', n_factors)
+  nms <- vector('character', n_factors)
+  nc <- 1
+
+  for (i in 1:ncol(mloc)) {
+    if (is.factor(tr_pos[, i])) {
+      fm <- matrix(tr_pos[est$neighbors, i], ncol = ipfmodel@params$k)
+      mloc[, i] <- factor(apply(fm, 1, function(x) names(which.max(table(x)))))
+      if (!is.null(test_pos)) {
+        name <- names(tr_pos)[i]
+        if (is.null(name)) {
+          name = paste0('confusion', nc)
+        }
+        confusion[[nc]] <- table(test_pos[, i], mloc[, i])
+        nms[nc] <- name
+        nc <- nc + 1
+      }
+    } else {
+      mloc[, i] <- rowSums(tr_pos[est$neighbors, i] * est$weights)
+      if (!is.null(test_pos)) {
+        col_errors <- col_errors + (mloc[, i] - test_pos[, i]) ^ 2
+      }
+    }
+  }
+
+  colnames(mloc) <- colnames(tr_pos)
+  names(confusion) <- nms
+
   errors <- c()
-  if (!is.null(loctest)) {
-    errors <- sqrt((mloc[, 1] - loctest[, 1])^2 + (mloc[, 2] - loctest[, 2])^2)
+  if (!is.null(test_pos)) {
+    errors <- sqrt(col_errors)
   }
-  return(ipfEstimation(location = mloc, grouploc = grouploc, errors = errors))
+
+  return(ipfEstimation(location = mloc,
+                       errors = errors,
+                       confusion = confusion,
+                       neighbors = est$neighbors,
+                       weights = est$weights))
 }
 
 
 #' Estimates the position of the observations from its fingerprints and the access point location
 #' usins a logarithmic path loss model
 #'
-#' @param dataRSSI  a matrix or a data frame containing the RSSI data (fingerprints) of the
-#'                  observations
-#' @param wapLOC    a matrix or a data frame containing the position of the wireless access
-#'                  points, in the same order as they appear in dataRSSI
-#' @param locdata   a matrix or a data frame containing the position of the data set observations
-#' @param rssirange range of the RSSI data
-#' @param norssi    value used to represent a not detected AP
-#' @param alpha     path loss exponent
-#' @param wapPow1   detected RSSI at one meter range
+#' @param fingerprints a matrix or a data frame containing the RSSI data (fingerprints) of the
+#'                     observations
+#' @param bpos         a matrix or a data frame containing the position of the beacons,
+#'                     in the same order as they appear in fingerprints
+#' @param fpositions   a matrix or a data frame containing the position of the fingerprints
+#' @param rssirange    range of the RSSI data
+#' @param norssi       value used to represent a not detected AP
+#' @param alpha        path loss exponent
+#' @param wapPow1      detected RSSI at one meter range
 #'
-#' @return          An S4 class object of type ipfEstimation, with the following slots:
-#'                  location ->   a matrix with the predicted locations
-#'                  grouploc ->   NULL
-#'                  errors   ->   a numeric vector with the errors, if loctest has been provided
+#' @return             An S4 class object of type ipfEstimation, with the following slots:
+#'                     location  ->   a matrix with the predicted locations
+#'                     errors    ->   a numeric vector with the errors, if loctest has been provided
+#'                     neighbors ->   NULL
+#'                     weights   ->   NULL
 #'
 #' @examples
 #'
@@ -563,30 +709,38 @@ ipfEstimate <- function(ipfmodel, locdata, loctest = NULL) {
 #' @importFrom methods new
 #'
 #' @export
-ipfProx <- function(dataRSSI, wapLOC, locdata = NULL, rssirange = c(-100, 0), norssi = NA,
+ipfProx <- function(fingerprints, bpos, fpositions = NULL, rssirange = c(-100, 0), norssi = NA,
                     alpha = 5, wapPow1 = -30) {
 
-  if (ncol(dataRSSI) != nrow(wapLOC)) stop("Incorrect dimmensions.")
-  notNAs <-!as.logical(rowSums(is.na(wapLOC[,])))
-  dataRSSI <- dataRSSI[, notNAs]
-  wapLOC <- wapLOC[notNAs, ]
+  if (ncol(fingerprints) != nrow(bpos)) stop("Incorrect dimmensions.")
+  notNAs <- !as.logical(rowSums(is.na(bpos[,])))
+  fingerprints <- fingerprints[, notNAs]
+  bpos <- bpos[notNAs, ]
 
-  dataRSSI[]  <- lapply(dataRSSI, trans_pos, imin = rssirange[1], imax = rssirange[2],
-                        omin = 0, omax = 100, ins = norssi, ons = 0)
+
+
+  fingerprints[] <- lapply(fingerprints, ipfTransform, inRange = rssirange, outRange = c(0, 100),
+                           inNoRSSI = norssi, outNoRSSI = 0)
 
   wP1 <- rep(trans_pos(x = wapPow1, imin = rssirange[1], imax = rssirange[2],
-                       omin = 0, omax = 100, ins = norssi, ons = 0), ncol(dataRSSI))
+                       omin = 0, omax = 100, ins = norssi, ons = 0), ncol(fingerprints))
 
-  mloc <- t(sapply(1:nrow(dataRSSI), function(i) minim(fingerprint = dataRSSI[i, ],
-                                                       wapPos = wapLOC, wP1 = wP1,
-                                                       alpha = alpha)))
+  mloc <- t(sapply(1:nrow(fingerprints), function(i) minim(fingerprint = fingerprints[i, ],
+                                                           wapPos = bpos, wP1 = wP1,
+                                                           alpha = alpha)))
 
   errors <- c()
-  if (!is.null(locdata)) {
-    errors <- sqrt((mloc[, 1] - locdata[, 1])^2 + (mloc[, 2] - locdata[, 2])^2)
+  if (!is.null(fpositions)) {
+    errors <- sqrt((mloc[, 1] - fpositions[, 1])^2 + (mloc[, 2] - fpositions[, 2])^2)
   }
-  return(ipfEstimation(location = mloc, grouploc = NULL, errors = errors))
+  mloc <- as.data.frame(mloc)
+  names(mloc) <- names(bpos)
 
+  return(ipfEstimation(location = mloc,
+                       errors = errors,
+                       confusion = NULL,
+                       neighbors = NULL,
+                       weights = NULL))
 }
 
 
@@ -603,7 +757,7 @@ minim <- function(par, fingerprint, wapPos, wP1, alpha) {
   optim(par = par, method = 'BFGS', fn = df, d1 = d1, wapPos = wapPos, w = w)$par
 }
 
-# Function to minimize to find position from fingerprint and WAPs position
+# Function to minimize to find position from fingerprint and WAPs location
 df <- function(pos, d1, wapPos, w) {
   d2 <- apply(wapPos, 1, function(x) sqrt((x[1] - pos[1])^2 + (x[2] - pos[2])^2))
   sum(sapply(1:ncol(d1), function(i) w[i] * (d1[,i] - d2[i])^2), na.rm = TRUE)
@@ -611,30 +765,50 @@ df <- function(pos, d1, wapPos, w) {
 
 
 # AVERAGE NUMBER OF WAPS PER OBSERVATION
-rmce_getANW <- function(traindata) {
-  traindata[traindata != 0] = 1
+rmce_getANW <- function(traindata, noRSSI = NA) {
+  if (is.na(noRSSI)) {
+    traindata[!is.na(traindata)] = 1
+  } else {
+    traindata[traindata != noRSSI] = 1
+  }
   return (mean(rowSums(traindata)))
 }
 
 # STANDARD DEVIATION OF THE NUMBER OF WAPS PER OBSERVATION
-rmce_getSDNW <- function(traindata) {
-  traindata[traindata != 0] = 1
+rmce_getSDNW <- function(traindata, noRSSI = NA) {
+  if (is.na(noRSSI)) {
+    traindata[!is.na(traindata)] = 1
+  } else {
+    traindata[traindata != noRSSI] = 1
+  }
   return (sd(rowSums(traindata)))
 }
 
 # AVERAGE RSSI (WHEN > 0)
-rmce_getAIW <- function(traindata) {
-  return(mean(c(t(traindata[traindata != 0]))))
+rmce_getAIW <- function(traindata, noRSSI = NA) {
+  if (is.na(noRSSI)) {
+    return(mean(c(t(traindata[!is.na(traindata)]))))
+  } else {
+    return(mean(c(t(traindata[traindata != noRSSI]))))
+  }
 }
 
 # MEDIAN RSSI (WHEN > 0)
-rmce_getMIW <- function(traindata) {
-  return(median(c(t(traindata[traindata != 0]))))
+rmce_getMIW <- function(traindata, noRSSI = NA) {
+  if (is.na(noRSSI)) {
+    return(median(c(t(traindata[!is.na(traindata)]))))
+  } else {
+    return(median(c(t(traindata[traindata != noRSSI]))))
+  }
 }
 
 # STANDARD DEVIATION OF RSSI (WHEN > 0)
-rmce_getSDIW <- function(traindata) {
-  return(sd(c(t(traindata[traindata != 0]))))
+rmce_getSDIW <- function(traindata, noRSSI = NA) {
+  if (is.na(noRSSI)) {
+    return(sd(c(t(traindata[!is.na(traindata)]))))
+  } else {
+    return(sd(c(t(traindata[traindata != noRSSI]))))
+  }
 }
 
 # NUMBER OF OBSERVATIONS
@@ -652,17 +826,18 @@ rmce_getNG <- function(locdata) {
 
 # AVERAGE DENSITY OF OBSERVATIONS
 rmce_getADP <- function(locdata) {
-  return (mean(rowMeans(ipfDist(locdata, locdata))))
+  return (mean(rowMeans(ipfDist(locdata, locdata), na.rm = TRUE)))
 }
 
 # AVERAGE DENSITY OF GROUPS
 #' @importFrom dplyr group_indices_ group_by summarise_each arrange "%>%" funs
 #'
 rmce_getADG <- function(locdata) {
+  meanNA <- function(x) mean(x, na.rm = TRUE)
   GROUP <- NULL
   gr <- group_indices_(locdata, .dots = names(locdata))
   locdata$GROUP <- gr
-  locdata <- locdata %>% group_by(GROUP) %>% summarise_each(funs(mean)) %>% arrange(GROUP)
+  locdata <- locdata %>% group_by(GROUP) %>% summarise_each(funs(meanNA)) %>% arrange(GROUP)
   locdata$GROUP <- NULL
   locdata <- as.data.frame(locdata)
   return (rmce_getADP(locdata))
@@ -675,20 +850,20 @@ rmce_getAAD <- function(locdata) {
 
 # WIDTH
 rmce_getW <- function(locdata) {
-  minW <- min(locdata[, 1])
-  maxW <- max(locdata[, 1])
+  minW <- min(locdata[, 1], na.rm = TRUE)
+  maxW <- max(locdata[, 1], na.rm = TRUE)
   return (abs(maxW - minW))
 }
 
 # HEIGHT
 rmce_getH <- function(locdata) {
-  minH <- min(locdata[, 2])
-  maxH <- max(locdata[, 2])
+  minH <- min(locdata[, 2], na.rm = TRUE)
+  maxH <- max(locdata[, 2], na.rm = TRUE)
   return (abs(maxH - minH))
 }
 
 # TRAINING RADIO MAP DATA PER CELL
-rm_getCD <- function(traindata, locdata, gridSize = 5) {
+rm_getCD <- function(traindata, locdata, noRSSI = NA, gridSize = 5) {
   minW <- min(locdata[, 1])
   maxW <- max(locdata[, 1])
   minH <- min(locdata[, 2])
@@ -721,12 +896,12 @@ rm_getCD <- function(traindata, locdata, gridSize = 5) {
       p <- locdata[s, ]
       t <- traindata[s, ]
 
-      nps <- c(nps, nrow(p))           # Number of observations in the grid
-      ngs <- c(ngs, rmce_getNG(p))     # Number of groups in the grid
-      anw <- c(anw, rmce_getANW(t))    # Average number of WAPs heard per observation in the grid
-      aiw <- c(aiw, rmce_getAIW(t))    # Average RSSI in the grid
-      miw <- c(miw, rmce_getMIW(t))    # Median RSSI in the grid
-      sdw <- c(sdw, rmce_getSDIW(t))   # Stardard deviation of RSSI in the grid
+      nps <- c(nps, nrow(p))                   # Number of observations in the grid
+      ngs <- c(ngs, rmce_getNG(p))             # Number of groups in the grid
+      anw <- c(anw, rmce_getANW(t, noRSSI))    # Average number of WAPs heard per observation in the grid
+      aiw <- c(aiw, rmce_getAIW(t, noRSSI))    # Average RSSI in the grid
+      miw <- c(miw, rmce_getMIW(t, noRSSI))    # Median RSSI in the grid
+      sdw <- c(sdw, rmce_getSDIW(t, noRSSI))   # Stardard deviation of RSSI in the grid
 
     }
   }
@@ -738,12 +913,12 @@ rm_getCD <- function(traindata, locdata, gridSize = 5) {
   ))
 }
 
-ipfrmdata <- function(traindata, locdata, gridSize = GRIDSIZE) {
-  ANW  <- rmce_getANW(traindata)    # AVERAGE NUMBER OF WAPS PER OBSERVATION
-  AIW  <- rmce_getAIW(traindata)    # AVERAGE RSSI
-  MIW  <- rmce_getMIW(traindata)    # MEDIAN RSSI
-  SDIW  <- rmce_getSDIW(traindata)  # STANDARD DEVIATION OF RSSI
-  SDNW <- rmce_getSDNW(traindata)   # STANDARD DEVIATION OF RSSI
+ipfrmdata <- function(traindata, locdata, noRSSI = NA, gridSize = GRIDSIZE) {
+  ANW  <- rmce_getANW(traindata, noRSSI)    # AVERAGE NUMBER OF WAPS PER OBSERVATION
+  AIW  <- rmce_getAIW(traindata, noRSSI)    # AVERAGE RSSI
+  MIW  <- rmce_getMIW(traindata, noRSSI)    # MEDIAN RSSI
+  SDIW  <- rmce_getSDIW(traindata, noRSSI)  # STANDARD DEVIATION OF RSSI
+  SDNW <- rmce_getSDNW(traindata, noRSSI)   # STANDARD DEVIATION OF RSSI
 
   NP <- rmce_getNP(locdata)     # TOTAL NUMBER OF OBSERVATIONS
   NG <- rmce_getNG(locdata)     # TOTAL NUMBER OF GROUPS
@@ -817,16 +992,17 @@ rectAD <- function(L1, L2) {
 #'
 #' @examples
 #'
-#'     model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168])
-#'     estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
+#'     model <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170])
+#'     estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
 #'     ipfPlotPdf(estimation)
 #'
 #' @importFrom ggplot2 ggplot aes geom_histogram geom_density geom_vline scale_color_manual
-#' @importFrom ggplot2 element_rect scale_alpha_manual scale_x_continuous labs theme
+#' @importFrom ggplot2 element_rect scale_alpha_manual scale_x_continuous labs theme element_text
 #' @importFrom methods is
 #'
 #' @export
-ipfPlotPdf <- function(estimation, xlab = 'error', ylab = 'density', title = '') {
+ipfPlotPdf <- function(estimation, xlab = 'error', ylab = 'density',
+                       title = 'Probability density function') {
   if (isS4(estimation) && is(estimation, "ipfEstimation")) {
     if (is.null(estimation@errors)) {
       stop("The estimation has no errors data.")
@@ -849,16 +1025,18 @@ ipfPlotPdf <- function(estimation, xlab = 'error', ylab = 'density', title = '')
   ggplot(data = errors, aes(errors$ERRORS)) +
     geom_histogram(aes(y = ..density..), binwidth = max(errors$ERRORS) / 50, alpha = .5) +
     geom_density(alpha = .2, fill = "#666666", colour = 'grey30') +
-    geom_vline(aes(xintercept = median(errors$ERRORS), color = "Median"),
-               alpha = 0.5, linetype = "longdash", size = 1, show.legend = TRUE) +
-    geom_vline(aes(xintercept = mean(errors$ERRORS), color = "Mean"), alpha = 0.5,
-               linetype = "longdash", size = 1, show.legend = TRUE) +
-    scale_color_manual(name = ' ', values = c(Median = "royalblue1", Mean = "firebrick1")) +
-    scale_alpha_manual(values = c(0.5, 0.5)) +
+    geom_vline(aes(xintercept = median(errors$ERRORS), color = "Median", linetype = "Median"),
+               alpha = 0.5, size = 1, show.legend = TRUE) +
+    geom_vline(aes(xintercept = mean(errors$ERRORS), color = "Mean", linetype = "Mean"),
+               alpha = 0.5, size = 1, show.legend = TRUE) +
+    scale_color_manual(name = '', values = c(Median = "royalblue1", Mean = "firebrick1")) +
+    scale_alpha_manual(name = '', values = c(0.5, 0.5)) +
     scale_x_continuous(breaks = seq(0, xmax, xtick)) +
+    scale_linetype_manual(name = '', values = c(Median = "longdash", Mean = "dotted")) +
     labs(x = "error",y = "density")  +
     labs(title = title) +
-    theme(legend.position = c(0.9, 0.85),
+    theme(plot.title = element_text(hjust = 0.5),
+          legend.position = c(0.9, 0.85),
           legend.background = element_rect(color = "transparent",
                                            fill = "transparent",
                                            size = 0,
@@ -874,18 +1052,19 @@ ipfPlotPdf <- function(estimation, xlab = 'error', ylab = 'density', title = '')
 #'
 #' @examples
 #'
-#'     model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168])
-#'     estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
+#'     model <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170])
+#'     estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
 #'     ipfPlotEcdf(estimation)
 #'
-#' @importFrom ggplot2 ggplot aes stat_ecdf geom_vline scale_color_manual
-#' @importFrom ggplot2 element_rect scale_alpha_manual scale_x_continuous labs theme
+#' @importFrom ggplot2 ggplot aes stat_ecdf geom_vline scale_color_manual element_text
+#' @importFrom ggplot2 element_rect scale_alpha_manual scale_x_continuous labs theme scale_linetype_manual
 #' @importFrom methods is
 #' @importFrom stats median pnorm sd
 #'
 #' @export
 ipfPlotEcdf <- function(estimation, xlab = 'error',
-                        ylab = 'cumulative density of error', title = '') {
+                        ylab = 'cumulative density of error',
+                        title = 'Empirical cumulative density function') {
   if (isS4(estimation) && is(estimation, "ipfEstimation")) {
     if (is.null(estimation@errors)) {
       stop("The estimation has no errors data.")
@@ -903,25 +1082,28 @@ ipfPlotEcdf <- function(estimation, xlab = 'error',
 
   ggplot(errors, aes(errors$ERRORS)) +
     stat_ecdf(geom = "line", alpha = .75) +
-    geom_vline(aes(xintercept = median(errors$ERRORS), color="Median"), alpha = 0.5,
-               linetype = "longdash", size = 1, show.legend = TRUE) +
-    geom_vline(aes(xintercept = mean(errors$ERRORS), color="Mean"), alpha = 0.5,
-               linetype = "longdash", size = 1, show.legend = TRUE) +
-    scale_color_manual(name = ' ', values = c(Median = "royalblue1", Mean = "firebrick1")) +
-    scale_alpha_manual(values = c(0.5, 0.5)) +
+    geom_vline(aes(xintercept = median(errors$ERRORS), color = "Median", linetype = "Median"),
+               alpha = 0.5, size = 1, show.legend = TRUE) +
+    geom_vline(aes(xintercept = mean(errors$ERRORS), color = "Mean", linetype = "Mean"),
+               alpha = 0.5, size = 1, show.legend = TRUE) +
+    scale_color_manual(name = '', values = c(Median = "royalblue1", Mean = "firebrick1")) +
+    scale_alpha_manual(name = '', values = c(0.5, 0.5)) +
     scale_x_continuous(breaks = seq(0, xmax, xtick)) +
+    scale_linetype_manual(name = '', values = c(Median = "longdash", Mean = "dotted")) +
     labs(y = "cumulative density of error", x = "error") +
     labs(title = title) +
-    theme(legend.position = c(0.9, 0.85),
+    theme(plot.title = element_text(hjust = 0.5),
+          legend.position = c(0.9, 0.85),
           legend.background = element_rect(color = "transparent",
                                            fill = "transparent",
                                            size = 0,
                                            linetype = "blank"))
+
 }
 
 #' Plots the spatial location of the observations
 #'
-#' @param locdata     a data frame or matrix with the positions
+#' @param positions   a data frame or matrix with the positions
 #' @param plabel      if TRUE, adds labels to groups / observations
 #' @param reverseAxis swaps axis
 #' @param xlab        x-axis label
@@ -940,14 +1122,14 @@ ipfPlotEcdf <- function(estimation, xlab = 'error',
 #' @importFrom ggplot2 ggplot aes geom_point geom_text geom_rect
 #'
 #' @export
-ipfPlotLoc <- function(locdata, plabel = FALSE, reverseAxis = FALSE, xlab = NULL, ylab = NULL,
+ipfPlotLoc <- function(positions, plabel = FALSE, reverseAxis = FALSE, xlab = NULL, ylab = NULL,
                        title = '', pgrid = FALSE) {
 
   if (reverseAxis) {
-    locdata <- locdata[,c(2, 1)]
+    positions <- positions[,c(2, 1)]
   }
 
-  p <- ggplot(locdata)
+  p <- ggplot(positions)
   # To avoid no visible binding for global variable
   GROUP <- NULL
   xmin <- NULL
@@ -956,10 +1138,10 @@ ipfPlotLoc <- function(locdata, plabel = FALSE, reverseAxis = FALSE, xlab = NULL
   ymax <- NULL
 
   if (pgrid) {
-    minX <- min(locdata[, 1])
-    maxX <- max(locdata[, 1])
-    minY <- min(locdata[, 2])
-    maxY <- max(locdata[, 2])
+    minX <- min(positions[, 1])
+    maxX <- max(positions[, 1])
+    minY <- min(positions[, 2])
+    maxY <- max(positions[, 2])
 
     columns <- ceiling(abs(maxX - minX) / GRIDSIZE)
     rows <- ceiling(abs(maxY - minY) / GRIDSIZE)
@@ -972,7 +1154,8 @@ ipfPlotLoc <- function(locdata, plabel = FALSE, reverseAxis = FALSE, xlab = NULL
         lyb <- minY + (r - 1) * GRIDSIZE
         lyt <- lyb + GRIDSIZE
 
-        s <- locdata[, 1] >= lxl & locdata[, 1] < lxr & locdata[, 2] >= lyb & locdata[, 2] < lyt
+        s <- positions[, 1] >= lxl & positions[, 1] < lxr &
+             positions[, 2] >= lyb & positions[, 2] < lyt
 
         if (sum(s) != 0) {
           rdata <- data.frame(xmin = lxl, xmax = lxr, ymin = lyb, ymax = lyt)
@@ -992,15 +1175,13 @@ ipfPlotLoc <- function(locdata, plabel = FALSE, reverseAxis = FALSE, xlab = NULL
         colour = 'grey60', alpha = 0, size = 0.3, fill = 'transparent'
       )
     )
-
-
   }
 
-  p <- p + geom_point(aes(x = locdata[, 1], y = locdata[, 2]), alpha = .25)
+  p <- p + geom_point(aes(x = positions[, 1], y = positions[, 2]), alpha = .25)
 
   if (plabel) {
-    groups <- ipfGroup(locdata)
-    label.data <- locdata
+    groups <- ipfGroup(positions)
+    label.data <- positions
     label.data$GROUP = groups
     label.data <- label.data %>% group_by(GROUP) %>% summarise_each(funs(mean)) %>% arrange(GROUP)
     p <- p + geom_text(
@@ -1010,11 +1191,11 @@ ipfPlotLoc <- function(locdata, plabel = FALSE, reverseAxis = FALSE, xlab = NULL
   }
 
   if (is.null(xlab)) {
-    xlab <- colnames(locdata)[1]
+    xlab <- colnames(positions)[1]
   }
 
   if (is.null(ylab)) {
-    ylab <- colnames(locdata)[2]
+    ylab <- colnames(positions)[2]
   }
   p <- p + labs(y = ylab, x = xlab) + labs(title = title)
 
@@ -1026,7 +1207,7 @@ ipfPlotLoc <- function(locdata, plabel = FALSE, reverseAxis = FALSE, xlab = NULL
 #'
 #' @param model           an ipfModel
 #' @param estimation      an ipfEstimation
-#' @param testloc         location of test observations
+#' @param testpos         position of the test observations
 #' @param observations    a numeric vector with the indices of estimations to plot
 #' @param reverseAxis     swaps axis
 #' @param showneighbors   plot the k selected neighbors
@@ -1037,22 +1218,22 @@ ipfPlotLoc <- function(locdata, plabel = FALSE, reverseAxis = FALSE, xlab = NULL
 #'
 #' @examples
 #'
-#'     model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168])
-#'     estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
+#'     model      <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170])
+#'     estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
 #'     ipfPlotEst(model, estimation, ipftest[, 169:170], observations = seq(7,10),
 #'                showneighbors = TRUE, reverseAxis = TRUE)
 #'
 #' @importFrom ggplot2 ggplot aes geom_point geom_segment geom_curve arrow unit
 #'
 #' @export
-ipfPlotEst <- function(model, estimation, testloc = NULL, observations = c(1),
+ipfPlotEst <- function(model, estimation, testpos = NULL, observations = c(1),
                        reverseAxis = FALSE, showneighbors = FALSE, showLabels = FALSE,
                        xlab = NULL, ylab = NULL, title = '') {
 
-  ePoints <- as.data.frame(matrix(estimation@location[observations, ], length(observations), 2))
+  ePoints <- as.data.frame(matrix(as.matrix(estimation@location[observations, ]), length(observations), 2))
   if (reverseAxis) {
-    if (!is.null(testloc)) {
-      testloc <- testloc[,c(2, 1)]
+    if (!is.null(testpos)) {
+      testpos <- testpos[,c(2, 1)]
     }
     ePoints <- ePoints[,c(2, 1)]
   }
@@ -1065,16 +1246,16 @@ ipfPlotEst <- function(model, estimation, testloc = NULL, observations = c(1),
   if (showneighbors) {
     nPoints <- NULL
     for (i in 1:length(observations)) {
-      np <- as.data.frame(matrix(estimation@grouploc[model@neighbors[observations[i],], 2:3],
-                                 model@k, 2))
+      np <- model@data$positions[estimation@neighbors[observations[i],], 1:2]
       if (reverseAxis) {
         np <- np[,c(2, 1)]
       }
       nPoints <- rbind(nPoints, np)
-      for (j in 1:model@k) {
-        sPoints <- rbind(sPoints, cbind(ePoints[i, ], nPoints[j + (i - 1) * model@k, ]))
+      for (j in 1:model@params$k) {
+        sPoints <- rbind(sPoints, cbind(ePoints[i, ], nPoints[j + (i - 1) * model@params$k, ]))
       }
     }
+
     p <- p + geom_point(data = nPoints, aes(x = nPoints[, 1], y = nPoints[, 2]),
                         size = 1.5, alpha = 0.75, col = 'orange') +
              geom_segment(data = sPoints, aes(x = sPoints[,1], xend = sPoints[, 3],
@@ -1082,10 +1263,11 @@ ipfPlotEst <- function(model, estimation, testloc = NULL, observations = c(1),
                alpha = 0.25, col = 'blue', size = 2)
   }
 
-  if (!is.null(testloc)) {
+
+  if (!is.null(testpos)) {
     cPoints <- NULL
     for (i in 1:length(observations)) {
-      cPoints <- rbind(cPoints, cbind(ePoints[i, ], testloc[observations[i], ]))
+      cPoints <- rbind(cPoints, cbind(ePoints[i, ], testpos[observations[i], ]))
     }
     cPoints[cPoints[,1] == cPoints[,3] & cPoints[,2] == cPoints[,4], ] <- NA
     p <- p + geom_point(data = cPoints,
@@ -1108,23 +1290,23 @@ ipfPlotEst <- function(model, estimation, testloc = NULL, observations = c(1),
   }
 
   if (is.null(xlab)) {
-    if (!is.null(testloc)) {
-      xlab <- colnames(testloc)[1]
+    if (!is.null(testpos)) {
+      xlab <- colnames(testpos)[1]
     } else {
       xlab <- ''
     }
   }
 
   if (is.null(ylab)) {
-    if (!is.null(testloc)) {
-     ylab <- colnames(testloc)[2]
+    if (!is.null(testpos)) {
+     ylab <- colnames(testpos)[2]
     } else {
       ylab <- ''
     }
   }
   p <- p + labs(y = ylab, x = xlab) + labs(title = title)
 
-  p
+  return (p)
 }
 
 

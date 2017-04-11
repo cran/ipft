@@ -5,17 +5,17 @@
 \title{Estimates the position of the observations from its fingerprints and the access point location
 usins a logarithmic path loss model}
 \usage{
-ipfProx(dataRSSI, wapLOC, locdata = NULL, rssirange = c(-100, 0),
+ipfProx(fingerprints, bpos, fpositions = NULL, rssirange = c(-100, 0),
   norssi = NA, alpha = 5, wapPow1 = -30)
 }
 \arguments{
-\item{dataRSSI}{a matrix or a data frame containing the RSSI data (fingerprints) of the
+\item{fingerprints}{a matrix or a data frame containing the RSSI data (fingerprints) of the
 observations}
 
-\item{wapLOC}{a matrix or a data frame containing the position of the wireless access
-points, in the same order as they appear in dataRSSI}
+\item{bpos}{a matrix or a data frame containing the position of the beacons,
+in the same order as they appear in fingerprints}
 
-\item{locdata}{a matrix or a data frame containing the position of the data set observations}
+\item{fpositions}{a matrix or a data frame containing the position of the fingerprints}
 
 \item{rssirange}{range of the RSSI data}
 
@@ -27,9 +27,10 @@ points, in the same order as they appear in dataRSSI}
 }
 \value{
 An S4 class object of type ipfEstimation, with the following slots:
-                 location ->   a matrix with the predicted locations
-                 grouploc ->   NULL
-                 errors   ->   a numeric vector with the errors, if loctest has been provided
+                    location  ->   a matrix with the predicted locations
+                    errors    ->   a numeric vector with the errors, if loctest has been provided
+                    neighbors ->   NULL
+                    weights   ->   NULL
 }
 \description{
 Estimates the position of the observations from its fingerprints and the access point location

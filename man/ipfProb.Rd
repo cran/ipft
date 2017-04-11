@@ -4,12 +4,17 @@
 \alias{ipfProb}
 \title{This function implements a probabilistic algorithm}
 \usage{
-ipfProb(train, test, groups, k = 3, FUN = sum, delta = 1, ...)
+ipfProb(train_fgp, train_pos, group_cols = NULL, groups = NULL, k = 3,
+  FUN = sum, delta = 1, ...)
 }
 \arguments{
-\item{train}{a data frame containing the RSSI vectors of the training set}
+\item{train_fgp}{a data frame containing the fingerprint vectors of the training set}
 
-\item{test}{a data frame containing the RSSI vectors of the test set}
+\item{train_pos}{a data frame containing the positions of the training set observations}
+
+\item{group_cols}{a character vector with the names of the columns to be used as the criteria
+to group the fingerprints. By default the groups will be created using all
+the columns available in the train_pos data frame.}
 
 \item{groups}{a numeric vector of length = nrow(train) containing the group index
 for the training vectors}
@@ -24,12 +29,9 @@ for the training vectors}
 }
 \value{
 An S4 class object of type ipfModel, with the following slots:
-                 neighbors -> a matrix with k columns and nrow(test) rows, with the
-                               k most similar training observation for each test observation
-                 weights ->    a matrix with k columns and nrow(test) rows, with the weights
-                 distances ->  a matrix with k columns and nrow(test) rows, with the distances
-                 k ->          k parameter
-                 groups ->     the group index for each training observation
+                 params ->     a list with the parameters passed to the function
+                 data   ->     a list with the fingerprints probabilistic parameters
+                               (means and standard deviations) and its locations
 }
 \description{
 This function implements a probabilistic algorithm
@@ -37,9 +39,10 @@ This function implements a probabilistic algorithm
 \examples{
 
     groups <- ipfGroup(ipftrain, LONGITUDE, LATITUDE)
-    model <- ipfProb(ipftrain[, 1:168], ipftest[, 1:168], groups)
+    model <- ipfProb(ipftrain[, 1:168], ipftrain[, 169:170], groups = groups)
 
-    groups <- ipfGroup(ipftrain, LONGITUDE, LATITUDE)
-    model <- ipfProb(ipftrain[, 1:168], ipftest[, 1:168], groups, k = 9, delta = 10)
+\dontrun{
+    model <- ipfProb(ipftrain[, 1:168], ipftrain[, 169:170], k = 9, delta = 10)
+}
 
 }

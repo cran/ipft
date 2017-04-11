@@ -4,13 +4,13 @@
 \alias{ipfEstbp}
 \title{Estimates the positions of the access points}
 \usage{
-ipfEstbp(dataRSSI, dataLOC, method = "wcentroid", rssirange = c(-100, 0),
-  norssi = NA)
+ipfEstbp(fingerprints, positions, method = "wcentroid", rssirange = c(-100,
+  0), norssi = NA)
 }
 \arguments{
-\item{dataRSSI}{a data frame or a matrix with the RSSI fingerprints}
+\item{fingerprints}{a data frame or a matrix with the RSSI fingerprints}
 
-\item{dataLOC}{a data frame or a matrix with the location of the fingerprints}
+\item{positions}{a data frame or a matrix with the positions of the fingerprints}
 
 \item{method}{method to use to estimate the position of the access points:
 'centroid', 'wcentroid' or 'wip'}

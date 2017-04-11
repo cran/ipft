@@ -4,11 +4,11 @@
 \alias{ipfPlotLoc}
 \title{Plots the spatial location of the observations}
 \usage{
-ipfPlotLoc(locdata, plabel = FALSE, reverseAxis = FALSE, xlab = NULL,
+ipfPlotLoc(positions, plabel = FALSE, reverseAxis = FALSE, xlab = NULL,
   ylab = NULL, title = "", pgrid = FALSE)
 }
 \arguments{
-\item{locdata}{a data frame or matrix with the positions}
+\item{positions}{a data frame or matrix with the positions}
 
 \item{plabel}{if TRUE, adds labels to groups / observations}
 

@@ -4,7 +4,7 @@
 \alias{ipfPlotEst}
 \title{Plots the estimated locations}
 \usage{
-ipfPlotEst(model, estimation, testloc = NULL, observations = c(1),
+ipfPlotEst(model, estimation, testpos = NULL, observations = c(1),
   reverseAxis = FALSE, showneighbors = FALSE, showLabels = FALSE,
   xlab = NULL, ylab = NULL, title = "")
 }
@@ -13,7 +13,7 @@ ipfPlotEst(model, estimation, testloc = NULL, observations = c(1),
 
 \item{estimation}{an ipfEstimation}
 
-\item{testloc}{location of test observations}
+\item{testpos}{position of the test observations}
 
 \item{observations}{a numeric vector with the indices of estimations to plot}
 
@@ -34,8 +34,8 @@ Plots the estimated locations
 }
 \examples{
 
-    model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168])
-    estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
+    model      <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170])
+    estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
     ipfPlotEst(model, estimation, ipftest[, 169:170], observations = seq(7,10),
                showneighbors = TRUE, reverseAxis = TRUE)
 

@@ -4,18 +4,21 @@
 \alias{ipfKnn}
 \title{Implements the k-nearest neighbors algorithm}
 \usage{
-ipfKnn(train, test, k = 3, method = "euclidean", norm = 2, sd = 5,
-  epsilon = 0.001, alpha = 1, threshold = 20, FUN = NULL, ...)
+ipfKnn(train_fgp, train_pos, k = 3, method = "euclidean",
+  weights = "distance", norm = 2, sd = 5, epsilon = 0.001, alpha = 1,
+  threshold = 20, FUN = NULL, ...)
 }
 \arguments{
-\item{train}{a data frame containing the RSSI vectors of the training set}
+\item{train_fgp}{a data frame containing the fingerprint vectors of the training set}
 
-\item{test}{a data frame containing the RSSI vectors of the test set}
+\item{train_pos}{a data frame containing the positions of the training set observations}
 
 \item{k}{the k parameter for knn algorithm (number of nearest neighbors)}
 
 \item{method}{the method to compute the distance between the RSSI vectors:
 'euclidean', 'manhattan', 'norm', 'LGD' or 'PLGD'}
+
+\item{weights}{the algorithm to compute the weights: 'distance' or 'uniform'}
 
 \item{norm}{parameter for the 'norm' method}
 
@@ -37,20 +40,14 @@ taken by the function must be train and test}
 }
 \value{
 An S4 class object of type ipfModel, with the following slots:
-                 neighbors -> a matrix with k columns and nrow(test) rows, with the
-                               k nearest neighbors for each test observation
-                 weights ->    a matrix with k columns and nrow(test) rows, with the
-                               weight for each neighbour
-                 distances ->  a matrix with k columns and nrow(test) rows, with the
-                               distances between test and each neighbour
-                 k ->          k parameter
-                 groups ->     the group index for each training observation
+                 params ->     a list with the parameters passed to the function
+                 data   ->     a list with the fingerprints and locations
 }
 \description{
 Implements the k-nearest neighbors algorithm
 }
 \examples{
 
-    model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168], k = 9, method = 'manhattan')
+    model <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170], k = 9, method = 'manhattan')
 
 }

@@ -4,7 +4,8 @@
 \alias{ipfPlotPdf}
 \title{Plots the probability density function of the estimated error}
 \usage{
-ipfPlotPdf(estimation, xlab = "error", ylab = "density", title = "")
+ipfPlotPdf(estimation, xlab = "error", ylab = "density",
+  title = "Probability density function")
 }
 \arguments{
 \item{estimation}{an ipfEstimation}
@@ -20,8 +21,8 @@ Plots the probability density function of the estimated error
 }
 \examples{
 
-    model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168])
-    estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
+    model <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170])
+    estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
     ipfPlotPdf(estimation)
 
 }

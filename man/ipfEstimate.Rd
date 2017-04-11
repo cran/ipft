@@ -4,31 +4,33 @@
 \alias{ipfEstimate}
 \title{Estimates the location of the test observations}
 \usage{
-ipfEstimate(ipfmodel, locdata, loctest = NULL)
+ipfEstimate(ipfmodel, test_fgp, test_pos = NULL)
 }
 \arguments{
 \item{ipfmodel}{an ipfModel}
 
-\item{locdata}{a matrix or a data frame containing the position of the training set observations}
+\item{test_fgp}{a matrix or a data frame containing the fingerprints of the test set}
 
-\item{loctest}{a matrix or a data frame containing the position of the test set observations}
+\item{test_pos}{a matrix or a data frame containing the position of the test set fingerprints}
 }
 \value{
 An S4 class object of type ipfEstimation, with the following slots:
                 location ->   a matrix with the predicted locations
-                grouploc ->   a matrix with the location data for each group
                 errors   ->   a numeric vector with the errors
+                neighbors ->  a matrix with k columns and nrow(test) rows, with the
+                              k most similar training observation for each test observation
+                weights ->    a matrix with k columns and nrow(test) rows, with the weights
 }
 \description{
 Estimates the location of the test observations
 }
 \examples{
 
-    model <- ipfKnn(ipftrain[, 1:168], ipftest[, 1:168])
-    estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
+    model <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170])
+    estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
 
-    groups <- ipfGroup(ipftrain, LONGITUDE, LATITUDE)
-    model <- ipfProb(ipftrain[, 1:168], ipftest[, 1:168], groups, k = 9, delta = 10)
-    estimation <- ipfEstimate(model, ipftrain[, 169:170], ipftest[, 169:170])
-
+\dontrun{
+    model <- ipfProb(ipftrain[, 1:168], ipftrain[, 169:170], k = 9, delta = 10)
+    estimation <- ipfEstimate(model, ipftest[, 1:170], ipftest[, 169:170])
+}
 }
