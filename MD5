@@ -1,8 +1,8 @@
-e650fac7e1e2bf6f089cc53fecdf730d *DESCRIPTION
+a38169b1c160f18f6cb7679fb08ac081 *DESCRIPTION
 2bcbd57c54c83c2992f3a70d75489a44 *NAMESPACE
 3edfbdcbb40f6dad7d3685e7666a834c *R/RcppExports.R
 85fe58767785e122ea5c06952d197ef3 *R/data.R
-e1df5fd56d57d96690146a547efa3bfd *R/ipft.R
+57d8583f5835aae485d2856c4606b473 *R/ipft.R
 43edb626f875485c60f99fe8ae8ae657 *data/ipfpwap.rda
 7afeae2237d992739b9f8708c171d0b5 *data/ipftest.rda
 12d175aaaf87c56fa89a6745c039d508 *data/ipftrain.rda
@@ -17,8 +17,8 @@ bdd22957a72dfb66d3c9e120a74445c9 *man/ipfPlotEcdf.Rd
 67e822042a5a771e31b721db49c33174 *man/ipfPlotLoc.Rd
 4ef57f839f4098b0d9fda288d8b485f4 *man/ipfPlotPdf.Rd
 8cbd253e38d0985252ecbcee67556625 *man/ipfProb.Rd
-c3986419324661d64ea643fd5474eafb *man/ipfProx.Rd
-ed13cecf9ad21f397e41945698bdb984 *man/ipfTransform.Rd
+9996519653394706ac17a14ce57fc0e3 *man/ipfProx.Rd
+a65ecf8c27879b7593e050bcc55179c2 *man/ipfTransform.Rd
 b5ffcdbf4665a8c7204ccd3c90c8ad31 *man/ipfpwap.Rd
 6725b60bc9e84be323caf8cd0bb7dc79 *man/ipftest.Rd
 cded05fee70495ed22538da3d51afb25 *man/ipftrain.Rd

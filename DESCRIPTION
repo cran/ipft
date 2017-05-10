@@ -2,7 +2,7 @@ Package: ipft
 Type: Package
 Title: Indoor Positioning Fingerprinting Toolset
 Depends: R (>= 2.10)
-Version: 0.5
+Version: 0.6
 Author: Emilio Sansano
 Maintainer: Emilio Sansano <esansano@uji.es>
 Description: Algorithms and utility functions for indoor positioning using fingerprinting techniques. 
@@ -18,6 +18,6 @@ RoxygenNote: 6.0.1
 LinkingTo: Rcpp
 Imports: Rcpp, methods, stats, apcluster, cluster, dplyr, ggplot2
 NeedsCompilation: yes
-Packaged: 2017-04-11 10:51:02 UTC; emilio
+Packaged: 2017-05-08 14:13:00 UTC; emilio
 Repository: CRAN
-Date/Publication: 2017-04-11 12:30:29 UTC
+Date/Publication: 2017-05-10 12:28:25 UTC

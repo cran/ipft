@@ -4,24 +4,26 @@
 \alias{ipfTransform}
 \title{Transform function}
 \usage{
-ipfTransform(data, inRange = c(-100, 0), outRange = c(0, 100),
-  inNoRSSI = NA, outNoRSSI = 0, trans = "linear", base = 10)
+ipfTransform(data, outRange = c(0, 100), outNoRSSI = 0, inRange = NULL,
+  inNoRSSI = 0, trans = "linear", base = exp(1), alpha = 24)
 }
 \arguments{
 \item{data}{a vector, matrix or data frame containing the RSSI vectors}
 
+\item{outRange}{the desired range for the output RSSI data.}
+
+\item{outNoRSSI}{value desired in the RSSI output data to represent a not detected AP.}
+
 \item{inRange}{a vector containing the range of the RSSI value from the
 initial data}
 
-\item{outRange}{the desired range for the output RSSI data.}
-
 \item{inNoRSSI}{value used in the RSSI data to represent a not detected AP.}
-
-\item{outNoRSSI}{value desired in the RSSI output data to represent a not detected AP.}
 
 \item{trans}{the transformation to perform, 'linear' or 'exponential'}
 
 \item{base}{base for the 'exponential' transformation}
+
+\item{alpha}{alpha parameter for the 'exponential' transformation}
 }
 \value{
 This function returns a vector, matrix or data frame containing

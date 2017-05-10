@@ -5,17 +5,12 @@
 \title{Estimates the position of the observations from its fingerprints and the access point location
 usins a logarithmic path loss model}
 \usage{
-ipfProx(fingerprints, bpos, fpositions = NULL, rssirange = c(-100, 0),
-  norssi = NA, alpha = 5, wapPow1 = -30)
+ipfProx(bpos, rssirange = c(-100, 0), norssi = NA, alpha = 5,
+  wapPow1 = -30)
 }
 \arguments{
-\item{fingerprints}{a matrix or a data frame containing the RSSI data (fingerprints) of the
-observations}
-
 \item{bpos}{a matrix or a data frame containing the position of the beacons,
 in the same order as they appear in fingerprints}
-
-\item{fpositions}{a matrix or a data frame containing the position of the fingerprints}
 
 \item{rssirange}{range of the RSSI data}
 

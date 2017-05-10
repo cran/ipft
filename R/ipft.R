@@ -1,8 +1,8 @@
 ## Rcpp::sourceCpp(normalizePath(file.path(".", "src", "ipf.cpp")))
 
-setClassUnion("numericOrNULL", members=c("numeric", "NULL"))
-setClassUnion("matrixOrNULL",  members=c("matrix", "NULL"))
-setClassUnion("listOrNULL",  members=c("list", "NULL"))
+setClassUnion("numericOrNULL", members = c("numeric", "NULL"))
+setClassUnion("matrixOrNULL",  members = c("matrix", "NULL"))
+setClassUnion("listOrNULL",  members = c("list", "NULL"))
 
 rmdata <- setClass(
   "rmdata",
@@ -20,6 +20,7 @@ rmdata <- setClass(
     MIW  = "numeric",
     SDIW = "numeric",
     SDNW = "numeric",
+    TCV  = "numeric",
 
     anppc  = "numeric",
     angpc  = "numeric",
@@ -108,7 +109,7 @@ ipfDist <- function(train, test, method = 'euclidean', subset = NULL, norm = 2,
          'PLGD'      = dist <- ipfPLGD(m_train, m_test, sd, epsilon, alpha, threshold),
          stop("invalid distance method.")
          )
-  return (dist)
+  return(dist)
 }
 
 #' Transform function
@@ -124,6 +125,7 @@ ipfDist <- function(train, test, method = 'euclidean', subset = NULL, norm = 2,
 #' @param outNoRSSI value desired in the RSSI output data to represent a not detected AP.
 #' @param trans     the transformation to perform, 'linear' or 'exponential'
 #' @param base      base for the 'exponential' transformation
+#' @param alpha     alpha parameter for the 'exponential' transformation
 #'
 #' @return This function returns a vector, matrix or data frame containing
 #'         the transformed data
@@ -134,15 +136,26 @@ ipfDist <- function(train, test, method = 'euclidean', subset = NULL, norm = 2,
 #'                  inNoRSSI = NA, outNoRSSI = 0)
 #'
 #' @export
-ipfTransform <- function(data, inRange = c(-100, 0), outRange = c(0, 100),
-                         inNoRSSI = NA, outNoRSSI = 0, trans = 'linear', base = 10) {
+ipfTransform <- function(data, outRange = c(0, 100), outNoRSSI = 0, inRange = NULL,
+                         inNoRSSI = 0, trans = 'linear', base = exp(1), alpha = 24) {
   tdata <- data
+  if (is.null(inRange)) {
+    if (is.na(inNoRSSI)) {
+      mx <- max(data, na.rm = TRUE)
+      mn <- min(data, na.rm = TRUE)
+    } else {
+      mx <- max(data[data == inNoRSSI] <- NA, na.rm = TRUE)
+      mn <- min(data[data == inNoRSSI] <- NA, na.rm = TRUE)
+    }
+    inRange = c(mx, mn)
+  }
+
   if (trans == 'linear') {
-    tdata[] <- lapply(data, trans_pos, imin = inRange[1], imax = inRange[2], omin = outRange[1],
+    tdata[] <- lapply(data, trans_lin, imin = inRange[1], imax = inRange[2], omin = outRange[1],
                      omax = outRange[2], ins = inNoRSSI, ons = outNoRSSI)
   } else if (trans == 'exponential') {
     tdata[] <- lapply(data, trans_exp, imin = inRange[1], imax = inRange[2], omin = outRange[1],
-                     omax = outRange[2], ins = inNoRSSI, ons = outNoRSSI, bs = base)
+                     omax = outRange[2], ins = inNoRSSI, a = alpha)
   }
   if (is.vector(data)) {
     tdata <- unlist(tdata)
@@ -150,10 +163,10 @@ ipfTransform <- function(data, inRange = c(-100, 0), outRange = c(0, 100),
     tdata <- unlist(tdata)
     dim(tdata) <- dim(data)
   }
-  return (tdata)
+  return(tdata)
 }
 
-trans_pos <- function(x, imin, imax, omin, omax, ins,  ons) {
+trans_lin <- function(x, imin, imax, omin, omax, ins,  ons) {
   if (is.na(ins)) {
     nos <- is.na(x)
   } else {
@@ -167,17 +180,9 @@ trans_pos <- function(x, imin, imax, omin, omax, ins,  ons) {
   x
 }
 
-trans_exp <- function(x, imin, imax, omin, omax, ins, ons, bs) {
-  if (is.na(ins)) {
-    nos <- is.na(x)
-  } else {
-    nos <- x == ins
-  }
-
-  m <- (omin - omax) / (bs ^ imin - bs ^ imax)
-  a <- omax - (bs ^ imax) * m
-  x <- a + m * (bs ^x)
-  x[nos] <- ons
+trans_exp <- function(x, imin, imax, omin, omax, ins, a) {
+  x <- trans_lin(x, imin, imax, omin = 0, omax = imax - imin, ins = ins, ons = 0)
+  x <- exp(x/a) / exp(-imin/a)
   x
 }
 
@@ -206,9 +211,9 @@ trans_exp <- function(x, imin, imax, omin, omax, ins, ons, bs) {
 #' @export
 ipfGroup <- function(data, ...) {
   if (missing(..0)) {
-    return (group_indices_(data, .dots = colnames(data)))
+    return(group_indices_(data, .dots = colnames(data)))
   } else {
-    return (group_indices(data, ...))
+    return(group_indices(data, ...))
   }
 }
 
@@ -298,7 +303,7 @@ ipfCluster <- function(data, method = 'k-means', k = NULL, grid = NULL, ...) {
   } else {
     stop("invalid method selected.")
   }
-  return (result)
+  return(result)
 }
 
 #' Estimates the positions of the access points
@@ -324,7 +329,7 @@ ipfEstbp <- function(fingerprints, positions, method = 'wcentroid', rssirange = 
     tdata[] <- lapply(fingerprints, ipfTransform, inRange = rssirange, outRange = c(0, 1),
                       inNoRSSI = norssi, outNoRSSI = 0)
   } else if (method == 'centroid') {
-    tdata[] <- lapply(fingerprints, function(x) x[x!=norssi] <- 1)
+    tdata[] <- lapply(fingerprints, function(x) x[x != norssi] <- 1)
   }
 
   # Normalize
@@ -336,7 +341,7 @@ ipfEstbp <- function(fingerprints, positions, method = 'wcentroid', rssirange = 
     aploc[i, 2] = sum(tdata[, i] * positions[, 2])
   }
   aploc[is.nan(aploc)] <- NA
-  return (aploc)
+  return(aploc)
 }
 
 
@@ -546,6 +551,73 @@ prob <- function(tr_mns, tr_sds, ts_fgp, k = 3, FUN = sum, delta = 1, ...) {
 
 }
 
+#' Estimates the position of the observations from its fingerprints and the access point location
+#' usins a logarithmic path loss model
+#'
+#' @param bpos         a matrix or a data frame containing the position of the beacons,
+#'                     in the same order as they appear in fingerprints
+#' @param rssirange    range of the RSSI data
+#' @param norssi       value used to represent a not detected AP
+#' @param alpha        path loss exponent
+#' @param wapPow1      detected RSSI at one meter range
+#'
+#' @return             An S4 class object of type ipfEstimation, with the following slots:
+#'                     location  ->   a matrix with the predicted locations
+#'                     errors    ->   a numeric vector with the errors, if loctest has been provided
+#'                     neighbors ->   NULL
+#'                     weights   ->   NULL
+#'
+#' @examples
+#'
+#'     ipfEst <- ipfProx(ipftrain[1:10, 1:168], ipfpwap, ipftrain[1:10, 169:170], alpha = 4)
+#'
+#' @importFrom methods new
+#'
+#' @export
+ipfProx <- function(bpos, rssirange = c(-100, 0), norssi = NA, alpha = 5, wapPow1 = -30) {
+
+  return(ipfModel(params = list(name = 'prox',
+                                rssirange = rssirange,
+                                norssi = norssi,
+                                alpha = alpha,
+                                wapPow1 = wapPow1),
+                  data   = list(positions = as.data.frame(bpos))))
+}
+
+
+prox <- function(fingerprints, fgps_pos, bpos, rssirange, norssi, alpha, wapPow1) {
+
+  if (ncol(fingerprints) != nrow(bpos)) stop("Incorrect dimmensions.")
+  notNAs <- !as.logical(rowSums(is.na(bpos[,])))
+  fingerprints <- fingerprints[, notNAs]
+  bpos <- bpos[notNAs, ]
+
+
+  fingerprints[] <- lapply(fingerprints, ipfTransform, inRange = rssirange, outRange = c(0, 100),
+                           inNoRSSI = norssi, outNoRSSI = 0)
+
+  wP1 <- rep(trans_lin(x = wapPow1, imin = rssirange[1], imax = rssirange[2],
+                       omin = 0, omax = 100, ins = norssi, ons = 0), ncol(fingerprints))
+
+  mloc <- t(sapply(1:nrow(fingerprints), function(i) minim(fingerprint = fingerprints[i, ],
+                                                           wapPos = bpos, wP1 = wP1,
+                                                           alpha = alpha)))
+
+  errors <- c()
+  if (!is.null(fgps_pos)) {
+    errors <- sqrt((mloc[, 1] - fgps_pos[, 1])^2 + (mloc[, 2] - fgps_pos[, 2])^2)
+  }
+  mloc <- as.data.frame(mloc)
+  names(mloc) <- names(bpos)
+
+  return(ipfEstimation(location = mloc,
+                       errors = errors,
+                       confusion = NULL,
+                       neighbors = NULL,
+                       weights = NULL))
+
+}
+
 #' Estimates the location of the test observations
 #'
 #' @param ipfmodel  an ipfModel
@@ -625,6 +697,16 @@ ipfEstimate <- function(ipfmodel, test_fgp, test_pos = NULL) {
         FUN = ipfmodel@params$FUN,
         unlist(ipfmodel@params$extra_params))
     }
+  } else if (ipfmodel@params$name == 'prox') {
+    return (prox(
+      fingerprints = test_fgp,
+      fgps_pos = test_pos,
+      bpos = ipfmodel@data$positions,
+      rssirange = ipfmodel@params$rssirange,
+      norssi = ipfmodel@params$norssi,
+      alpha = ipfmodel@params$alpha,
+      wapPow1 = ipfmodel@params$wapPow1
+    ))
   } else {
     stop("Invalid model.")
   }
@@ -683,65 +765,8 @@ ipfEstimate <- function(ipfmodel, test_fgp, test_pos = NULL) {
 }
 
 
-#' Estimates the position of the observations from its fingerprints and the access point location
-#' usins a logarithmic path loss model
-#'
-#' @param fingerprints a matrix or a data frame containing the RSSI data (fingerprints) of the
-#'                     observations
-#' @param bpos         a matrix or a data frame containing the position of the beacons,
-#'                     in the same order as they appear in fingerprints
-#' @param fpositions   a matrix or a data frame containing the position of the fingerprints
-#' @param rssirange    range of the RSSI data
-#' @param norssi       value used to represent a not detected AP
-#' @param alpha        path loss exponent
-#' @param wapPow1      detected RSSI at one meter range
-#'
-#' @return             An S4 class object of type ipfEstimation, with the following slots:
-#'                     location  ->   a matrix with the predicted locations
-#'                     errors    ->   a numeric vector with the errors, if loctest has been provided
-#'                     neighbors ->   NULL
-#'                     weights   ->   NULL
-#'
-#' @examples
-#'
-#'     ipfEst <- ipfProx(ipftrain[1:10, 1:168], ipfpwap, ipftrain[1:10, 169:170], alpha = 4)
-#'
-#' @importFrom methods new
-#'
-#' @export
-ipfProx <- function(fingerprints, bpos, fpositions = NULL, rssirange = c(-100, 0), norssi = NA,
-                    alpha = 5, wapPow1 = -30) {
-
-  if (ncol(fingerprints) != nrow(bpos)) stop("Incorrect dimmensions.")
-  notNAs <- !as.logical(rowSums(is.na(bpos[,])))
-  fingerprints <- fingerprints[, notNAs]
-  bpos <- bpos[notNAs, ]
 
 
-
-  fingerprints[] <- lapply(fingerprints, ipfTransform, inRange = rssirange, outRange = c(0, 100),
-                           inNoRSSI = norssi, outNoRSSI = 0)
-
-  wP1 <- rep(trans_pos(x = wapPow1, imin = rssirange[1], imax = rssirange[2],
-                       omin = 0, omax = 100, ins = norssi, ons = 0), ncol(fingerprints))
-
-  mloc <- t(sapply(1:nrow(fingerprints), function(i) minim(fingerprint = fingerprints[i, ],
-                                                           wapPos = bpos, wP1 = wP1,
-                                                           alpha = alpha)))
-
-  errors <- c()
-  if (!is.null(fpositions)) {
-    errors <- sqrt((mloc[, 1] - fpositions[, 1])^2 + (mloc[, 2] - fpositions[, 2])^2)
-  }
-  mloc <- as.data.frame(mloc)
-  names(mloc) <- names(bpos)
-
-  return(ipfEstimation(location = mloc,
-                       errors = errors,
-                       confusion = NULL,
-                       neighbors = NULL,
-                       weights = NULL))
-}
 
 
 #' @importFrom stats optim
@@ -750,7 +775,7 @@ minim <- function(par, fingerprint, wapPos, wP1, alpha) {
   # Escoger un punto inicial. El correspondiente al WAP con mayor señal.
   par = wapPos[which.max(fingerprint),]
 
-  d1 <- 10 ^ ((wP1 - fingerprint)/ (10 * alpha))
+  d1 <- 10 ^ ((wP1 - fingerprint) / (10 * alpha))
   sdd <- 4
   sd <- (sdd * log(10) / (10 * alpha))
   w <- 1 / (d1^2 * exp(sd ^ 2) * (exp(sd ^ 2) - 1))
@@ -771,7 +796,7 @@ rmce_getANW <- function(traindata, noRSSI = NA) {
   } else {
     traindata[traindata != noRSSI] = 1
   }
-  return (mean(rowSums(traindata)))
+  return(mean(rowSums(traindata)))
 }
 
 # STANDARD DEVIATION OF THE NUMBER OF WAPS PER OBSERVATION
@@ -781,7 +806,7 @@ rmce_getSDNW <- function(traindata, noRSSI = NA) {
   } else {
     traindata[traindata != noRSSI] = 1
   }
-  return (sd(rowSums(traindata)))
+  return(sd(rowSums(traindata)))
 }
 
 # AVERAGE RSSI (WHEN > 0)
@@ -813,20 +838,18 @@ rmce_getSDIW <- function(traindata, noRSSI = NA) {
 
 # NUMBER OF OBSERVATIONS
 rmce_getNP <- function(locdata) {
-  return (nrow(locdata))
+  return(nrow(locdata))
 }
 
 # NUMBER OF GROUPS
 #' @importFrom dplyr group_indices_
 rmce_getNG <- function(locdata) {
-  # print(dim(locdata))
-  # print(length(unique(group_indices_(locdata, .dots = names(locdata)))))
-  return (length(unique(group_indices_(locdata, .dots = names(locdata)))))
+  return(length(unique(ipfGroup(locdata))))
 }
 
 # AVERAGE DENSITY OF OBSERVATIONS
 rmce_getADP <- function(locdata) {
-  return (mean(rowMeans(ipfDist(locdata, locdata), na.rm = TRUE)))
+  return(mean(rowMeans(ipfDist(locdata, locdata), na.rm = TRUE)))
 }
 
 # AVERAGE DENSITY OF GROUPS
@@ -840,26 +863,26 @@ rmce_getADG <- function(locdata) {
   locdata <- locdata %>% group_by(GROUP) %>% summarise_each(funs(meanNA)) %>% arrange(GROUP)
   locdata$GROUP <- NULL
   locdata <- as.data.frame(locdata)
-  return (rmce_getADP(locdata))
+  return(rmce_getADP(locdata))
 }
 
 # AVERAGE DISTANCE BETWEEN TWO RANDOM POINTS INSIDE A RECTANGLE
 rmce_getAAD <- function(locdata) {
-  return (rectAD(rmce_getW(locdata), rmce_getH(locdata)))
+  return(rectAD(rmce_getW(locdata), rmce_getH(locdata)))
 }
 
 # WIDTH
 rmce_getW <- function(locdata) {
   minW <- min(locdata[, 1], na.rm = TRUE)
   maxW <- max(locdata[, 1], na.rm = TRUE)
-  return (abs(maxW - minW))
+  return(abs(maxW - minW))
 }
 
 # HEIGHT
 rmce_getH <- function(locdata) {
   minH <- min(locdata[, 2], na.rm = TRUE)
   maxH <- max(locdata[, 2], na.rm = TRUE)
-  return (abs(maxH - minH))
+  return(abs(maxH - minH))
 }
 
 # TRAINING RADIO MAP DATA PER CELL
@@ -902,46 +925,76 @@ rm_getCD <- function(traindata, locdata, noRSSI = NA, gridSize = 5) {
       aiw <- c(aiw, rmce_getAIW(t, noRSSI))    # Average RSSI in the grid
       miw <- c(miw, rmce_getMIW(t, noRSSI))    # Median RSSI in the grid
       sdw <- c(sdw, rmce_getSDIW(t, noRSSI))   # Stardard deviation of RSSI in the grid
-
     }
   }
 
-  return (list(
+  return(list(
     anppc = mean(nps), angpc = mean(ngs), sdnppc = sd(nps), sdngpc = sd(ngs),
     anwpc = mean(anw), sdnwpc = sd(anw), aiwpc = mean(aiw), sdiwpc = sd(aiw),
     area = ng * gridSize * gridSize
   ))
 }
 
-ipfrmdata <- function(traindata, locdata, noRSSI = NA, gridSize = GRIDSIZE) {
-  ANW  <- rmce_getANW(traindata, noRSSI)    # AVERAGE NUMBER OF WAPS PER OBSERVATION
-  AIW  <- rmce_getAIW(traindata, noRSSI)    # AVERAGE RSSI
-  MIW  <- rmce_getMIW(traindata, noRSSI)    # MEDIAN RSSI
-  SDIW  <- rmce_getSDIW(traindata, noRSSI)  # STANDARD DEVIATION OF RSSI
-  SDNW <- rmce_getSDNW(traindata, noRSSI)   # STANDARD DEVIATION OF RSSI
 
-  NP <- rmce_getNP(locdata)     # TOTAL NUMBER OF OBSERVATIONS
-  NG <- rmce_getNG(locdata)     # TOTAL NUMBER OF GROUPS
-  ADP <- rmce_getADP(locdata)   # AVERAGE DISTANCE BETWEEN OBSERVATIONS
-  ADG <- rmce_getADG(locdata)   # AVERAGE DISTANCE BETWEEN GROUPS
-  AAD <- rmce_getAAD(locdata)   # AVERAGE DISTANCE BETWEEN TWO RANDOM POINTS (RECTANGLE WxH)
-  W <- rmce_getW(locdata)       # TOTAL AREA WIDTH
-  H <- rmce_getH(locdata)       # TOTAL AREA HEIGHT
+rmce_getTCV <- function(fingerprints, positions, rangeRSSI, noRSSI) {
+  set.seed(42)
+  fingerprints <- ipfTransform(fingerprints, inRange = rangeRSSI, outRange = c(0, 100),
+                               inNoRSSI = noRSSI, outNoRSSI = 0)
+  N       <- 10
+  cv      <- 0.7
+  error   <- 0
+  tot_n   <- nrow(fingerprints)
+  tr_size <- floor(tot_n * cv)
+  for (i in 1:N) {
+    tr_ind   <- sample(1:tot_n, tr_size)
 
-  rmcd <- rm_getCD(traindata, locdata)
+    tr_set_f <- fingerprints[tr_ind, ]
+    ts_set_f <- fingerprints[-tr_ind, ]
+    tr_set_p <- positions[tr_ind, ]
+    ts_set_p <- positions[-tr_ind, ]
 
-  RmData <- NULL
+    knnModel <- ipfKnn(tr_set_f, tr_set_p, k = 1)
+    knnEst   <- ipfEstimate(knnModel, ts_set_f, ts_set_p)
+    error    <- error + mean(knnEst@errors)
+  }
 
-  wfrmdata <- RmData(
+  result <- error / N
+  return(result)
+}
+
+ipfrmdata <- function(fingerprints, positions, rangeRSSI = c(-100, 0), noRSSI = NA,
+                      gridSize = GRIDSIZE) {
+  ANW  <- rmce_getANW(fingerprints, noRSSI)                       # AVERAGE NUMBER OF WAPS PER OBS
+  AIW  <- rmce_getAIW(fingerprints, noRSSI)                       # AVERAGE RSSI
+  MIW  <- rmce_getMIW(fingerprints, noRSSI)                       # MEDIAN RSSI
+  SDIW <- rmce_getSDIW(fingerprints, noRSSI)                      # STANDARD DEVIATION OF RSSI
+  SDNW <- rmce_getSDNW(fingerprints, noRSSI)                      # STANDARD DEVIATION OF RSSI
+  TCV  <- rmce_getTCV(fingerprints, positions, rangeRSSI, noRSSI) # STANDARD DEVIATION OF RSSI
+
+  NP   <- rmce_getNP(positions)    # TOTAL NUMBER OF OBSERVATIONS
+  NG   <- rmce_getNG(positions)    # TOTAL NUMBER OF GROUPS
+  ADP  <- rmce_getADP(positions)   # AVERAGE DISTANCE BETWEEN OBSERVATIONS
+  ADG  <- rmce_getADG(positions)   # AVERAGE DISTANCE BETWEEN GROUPS
+  AAD  <- rmce_getAAD(positions)   # AVERAGE DISTANCE BETWEEN TWO RANDOM POINTS (RECTANGLE WxH)
+  W    <- rmce_getW(positions)     # TOTAL AREA WIDTH
+  H    <- rmce_getH(positions)     # TOTAL AREA HEIGHT
+
+  rmcd <- rm_getCD(fingerprints, positions, noRSSI = noRSSI, gridSize = GRIDSIZE)
+
+  rmdata <- NULL
+
+  frmdata <- rmdata(
     ANW = ANW, AIW = AIW, MIW = MIW, SDIW = SDIW, SDNW = SDNW,
-    NP = NP, NG = NG, ADP = ADP, ADG = ADG, AAD = AAD,
+    TCV = TCV, NP = NP, NG = NG, ADP = ADP, ADG = ADG, AAD = AAD,
     W = W, H = H, anppc = rmcd$anppc, angpc = rmcd$angpc,
     sdnppc = rmcd$sdnppc, sdngpc = rmcd$sdngpc, anwpc = rmcd$anwpc,
     sdnwpc = rmcd$sdnwpc, aiwpc = rmcd$aiwpc, sdiwpc = rmcd$sdiwpc,
     area = rmcd$area
   )
-  return (wfrmdata)
+  return(frmdata)
 }
+
+
 
 rmce <- function(rmdata) {
   NP <- rmdata@NP   # NUMBER OF POINTS
@@ -955,6 +1008,7 @@ rmce <- function(rmdata) {
   AIW <- rmdata@AIW # AVERAGE RSSI (WHEN > 0)
   MIW <- rmdata@MIW # MEDIAN RSSI (WHEN > 0)
   SDW <- rmdata@SDW # STANDARD DEVIATION OF RSSI (WHEN > 0)
+  TCV <- rmdata@TCV # CROSS VALIDATION RESULT
 
   A <- W * H        # AREA
 
@@ -972,7 +1026,7 @@ rmce <- function(rmdata) {
   #              NG, ', ADP: ', round(ADP, 2), ', ADG: ', round(ADG, 2), ', AAD: ',
   #              round(AAD, 2), ', W: ', round(W, 2), ', H: ', round(H, 2), ', ce: ',
   #              round(ce, 2)))
-  return (ce)
+  return(ce)
 }
 
 rectAD <- function(L1, L2) {
@@ -980,7 +1034,7 @@ rectAD <- function(L1, L2) {
   t1 <- (L1^3) / (L2^2) + (L2^3) / (L1^2)
   t2 <- d * (3 - (L1^2) / (L2^2) - (L2^2) / (L1^2))
   t3 <- (5 / 2) * (((L2^2) / L1) * log((L1 + d) / L2) + ((L1^2) / L2) * log((L2 + d) / L1))
-  return ((t1 + t2 + t3) / 15)
+  return((t1 + t2 + t3) / 15)
 }
 
 #' Plots the probability density function of the estimated error
@@ -1306,7 +1360,7 @@ ipfPlotEst <- function(model, estimation, testpos = NULL, observations = c(1),
   }
   p <- p + labs(y = ylab, x = xlab) + labs(title = title)
 
-  return (p)
+  return(p)
 }
 
 
