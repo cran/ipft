@@ -14,7 +14,7 @@ ipfEstimate(ipfmodel, test_fgp, test_pos = NULL)
 \item{test_pos}{a matrix or a data frame containing the position of the test set fingerprints}
 }
 \value{
-An S4 class object of type ipfEstimation, with the following slots:
+An S3 object of class ipfEstimation, with the following properties:
                 location ->   a matrix with the predicted locations
                 errors   ->   a numeric vector with the errors
                 neighbors ->  a matrix with k columns and nrow(test) rows, with the

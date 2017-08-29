@@ -52,7 +52,7 @@ double norm(NumericVector x, NumericVector y, double normVal) {
   double d = 0;
   for (int i = 0; i < x.length(); i++) {
     if (!R_IsNA(x[i]) && !R_IsNA(y[i])) {
-      d = d + std::pow(abs(x[i] - y[i]), normVal);
+      d = d + std::pow(fabs(x[i] - y[i]), normVal);
     }
   }
   return std::pow(d, 1 / normVal);
@@ -62,7 +62,7 @@ double manhattan(NumericVector x, NumericVector y) {
   double d = 0;
   for (int i = 0; i < x.length(); i++) {
     if (!R_IsNA(x[i]) && !R_IsNA(y[i])) {
-      d = d + std::abs(x[i] - y[i]);
+      d = d + std::fabs(x[i] - y[i]);
     }
   }
   return d;

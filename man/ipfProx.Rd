@@ -21,7 +21,7 @@ in the same order as they appear in fingerprints}
 \item{wapPow1}{detected RSSI at one meter range}
 }
 \value{
-An S4 class object of type ipfEstimation, with the following slots:
+An S3 object of class ipfEstimation, with the following properties:
                     location  ->   a matrix with the predicted locations
                     errors    ->   a numeric vector with the errors, if loctest has been provided
                     neighbors ->   NULL

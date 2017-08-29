@@ -28,7 +28,7 @@ for the training vectors}
 \item{...}{additional parameters for provided function FUN}
 }
 \value{
-An S4 class object of type ipfModel, with the following slots:
+An S3 object of class ipfModel, with the following properties:
                  params ->     a list with the parameters passed to the function
                  data   ->     a list with the fingerprints probabilistic parameters
                                (means and standard deviations) and its locations
