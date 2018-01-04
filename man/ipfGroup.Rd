@@ -26,6 +26,6 @@ and assigns an id to each group
 
     group <- ipfGroup(mtcars, gear, carb)
 
-    group <- ipfGroup(ipftrain, LONGITUDE, LATITUDE)
+    group <- ipfGroup(ipftrain, X, Y)
 
 }

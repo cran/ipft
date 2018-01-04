@@ -2,7 +2,7 @@ Package: ipft
 Type: Package
 Title: Indoor Positioning Fingerprinting Toolset
 Depends: R (>= 2.10)
-Version: 0.7.1
+Version: 0.7.2
 Authors@R: c(
     person("Emilio", "Sansano", email = "esansano@uji.es", role = c("aut", "cre")),
     person("Raúl", "Montoliu", email = "montoliu@uji.es", role = "ctb"))
@@ -20,8 +20,8 @@ RoxygenNote: 6.0.1
 LinkingTo: Rcpp
 Imports: Rcpp, methods, stats, apcluster, cluster, dplyr, ggplot2
 NeedsCompilation: yes
-Packaged: 2017-08-29 15:28:05 UTC; emilio
+Packaged: 2018-01-03 15:51:29 UTC; emilio
 Author: Emilio Sansano [aut, cre],
   Raúl Montoliu [ctb]
 Repository: CRAN
-Date/Publication: 2017-08-29 15:41:52 UTC
+Date/Publication: 2018-01-04 09:36:52 UTC

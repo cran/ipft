@@ -26,16 +26,16 @@ GRIDSIZE <- 5
 #'     test observations to train observations
 #'
 #' @examples
-#'     dist <- ipfDist(ipftrain[,1:168], ipftest[,1:168])
+#'     dist <- ipfDistance(ipftrain[,1:168], ipftest[,1:168])
 #'
-#'     dist <- ipfDist(ipftrain, ipftest, subset = c('LONGITUDE', 'LATITUDE'), method = 'manhattan')
+#'     dist <- ipfDistance(ipftrain, ipftest, subset = c('X', 'Y'), method = 'manhattan')
 #'
 #' @useDynLib ipft
 #' @importFrom Rcpp sourceCpp
 #'
 #' @export
-ipfDist <- function(train, test, method = 'euclidean', subset = NULL, norm = 2,
-                    sd = 10, epsilon = 1e-30, alpha = 20, threshold = 20) {
+ipfDistance <- function(train, test, method = 'euclidean', subset = NULL, norm = 2,
+                        sd = 10, epsilon = 1e-30, alpha = 20, threshold = 20) {
   if (is.null(subset)) {
     m_train <- as.matrix(train)
     m_test  <- as.matrix(test)
@@ -67,7 +67,7 @@ ipfDist <- function(train, test, method = 'euclidean', subset = NULL, norm = 2,
 #' @param outRange  the desired range for the output RSSI data.
 #' @param inNoRSSI  value used in the RSSI data to represent a not detected AP.
 #' @param outNoRSSI value desired in the RSSI output data to represent a not detected AP.
-#' @param trans     the transformation to perform, 'linear' or 'exponential'
+#' @param trans     the transformation to perform, 'scale' or 'exponential'
 #' @param base      base for the 'exponential' transformation
 #' @param alpha     alpha parameter for the 'exponential' transformation
 #'
@@ -80,8 +80,8 @@ ipfDist <- function(train, test, method = 'euclidean', subset = NULL, norm = 2,
 #'                  inNoRSSI = NA, outNoRSSI = 0)
 #'
 #' @export
-ipfTransform <- function(data, outRange = c(0, 100), outNoRSSI = 0, inRange = NULL,
-                         inNoRSSI = 0, trans = 'linear', base = exp(1), alpha = 24) {
+ipfTransform <- function(data, outRange = c(0, 1), outNoRSSI = 0, inRange = NULL,
+                         inNoRSSI = 0, trans = 'scale', base = exp(1), alpha = 24) {
   tdata <- data
   if (is.null(inRange)) {
     if (is.na(inNoRSSI)) {
@@ -94,7 +94,7 @@ ipfTransform <- function(data, outRange = c(0, 100), outNoRSSI = 0, inRange = NU
     inRange = c(mx, mn)
   }
 
-  if (trans == 'linear') {
+  if (trans == 'scale') {
     tdata[] <- lapply(data, trans_lin, imin = inRange[1], imax = inRange[2], omin = outRange[1],
                      omax = outRange[2], ins = inNoRSSI, ons = outNoRSSI)
   } else if (trans == 'exponential') {
@@ -148,7 +148,7 @@ trans_exp <- function(x, imin, imax, omin, omax, ins, a) {
 #'
 #'     group <- ipfGroup(mtcars, gear, carb)
 #'
-#'     group <- ipfGroup(ipftrain, LONGITUDE, LATITUDE)
+#'     group <- ipfGroup(ipftrain, X, Y)
 #'
 #' @importFrom dplyr group_indices group_indices_
 #'
@@ -174,7 +174,11 @@ ipfGroup <- function(data, ...) {
 #'               'AP' for affinity propagation algorithm.
 #' @param k      parameter k
 #' @param grid   a vector with the grid size for the 'grid' method
-#' @param ...    additional parameters for apcluster and apclusterK
+#' @param ...    additional parameters for k-means, apcluster and apclusterK
+#'               for 'k-means' method additional parameters see:
+#'               https://stat.ethz.ch/R-manual/R-devel/library/stats/html/kmeans.html
+#'               for 'apcluster'AP' method additional parameters see:
+#'               https://cran.r-project.org/web/packages/apcluster/index.html
 #'
 #' @return       A list with:
 #'                  clusters -> a numeric vector with the ids of the clusters
@@ -250,22 +254,22 @@ ipfCluster <- function(data, method = 'k-means', k = NULL, grid = NULL, ...) {
   return(result)
 }
 
-#' Estimates the positions of the access points
+#' Estimates the positions of the emitter beacons
 #'
 #' @param fingerprints a data frame or a matrix with the RSSI fingerprints
 #' @param positions    a data frame or a matrix with the positions of the fingerprints
 #' @param method       method to use to estimate the position of the access points:
 #'                     'centroid', 'wcentroid' or 'wip'
 #' @param rssirange    a numeric vector with the range of the RSSI data
-#' @param norssi       value used in dataRSSI when an access point is not detected
+#' @param norssi       value used in dataRSSI when a beacon is not detected
 #'
 #' @examples
 #'
-#'     wapp <- ipfEstbp(ipftrain[, 1:168], ipftrain[, 169:170], method = 'wcentroid')
+#'     wapp <- ipfEstimateBeaconPositions(ipftrain[, 1:168], ipftrain[, 169:170], method = 'wcentroid')
 #'
 #' @export
-ipfEstbp <- function(fingerprints, positions, method = 'wcentroid', rssirange = c(-100, 0),
-                     norssi = NA) {
+ipfEstimateBeaconPositions <- function(fingerprints, positions, method = 'wcentroid', rssirange = c(-100, 0),
+                                       norssi = NA) {
 
   tdata <- fingerprints
 
@@ -363,7 +367,7 @@ knn <- function(tr_fgp, ts_fgp, k = 3, method = 'euclidean', weights = 'distance
       dm <- FUN(tr_fgp, ts_fgp, ...)
     }
   } else {
-    dm <- ipfDist(train = tr_fgp, test = ts_fgp, method = method, norm = norm, sd = sd,
+    dm <- ipfDistance(train = tr_fgp, test = ts_fgp, method = method, norm = norm, sd = sd,
                   epsilon = epsilon, alpha = alpha, threshold = threshold)
   }
   ne <- matrix(0, nrow = nrow(ts_fgp), ncol = k)
@@ -403,18 +407,18 @@ knn <- function(tr_fgp, ts_fgp, k = 3, method = 'euclidean', weights = 'distance
 #'
 #' @examples
 #'
-#'     groups <- ipfGroup(ipftrain, LONGITUDE, LATITUDE)
-#'     model <- ipfProb(ipftrain[, 1:168], ipftrain[, 169:170], groups = groups)
+#'     groups <- ipfGroup(ipftrain, X, Y)
+#'     model <- ipfProbabilistic(ipftrain[, 1:168], ipftrain[, 169:170], groups = groups)
 #'
 #'\dontrun{
-#'     model <- ipfProb(ipftrain[, 1:168], ipftrain[, 169:170], k = 9, delta = 10)
+#'     model <- ipfProbabilistic(ipftrain[, 1:168], ipftrain[, 169:170], k = 9, delta = 10)
 #' }
 #'
 #' @importFrom methods new
 #'
 #' @export
-ipfProb <- function(train_fgp, train_pos, group_cols = NULL, groups = NULL, k = 3,
-                    FUN = sum, delta = 1, ...) {
+ipfProbabilistic <- function(train_fgp, train_pos, group_cols = NULL, groups = NULL, k = 3,
+                             FUN = sum, delta = 1, ...) {
   if (nrow(train_fgp) != nrow(train_pos)) {
     stop("train_fgp and train_pos must have the same number of rows")
   }
@@ -518,12 +522,12 @@ prob <- function(tr_mns, tr_sds, ts_fgp, k = 3, FUN = sum, delta = 1, ...) {
 #'
 #' @examples
 #'
-#'     ipfEst <- ipfProx(ipftrain[1:10, 1:168], ipfpwap, ipftrain[1:10, 169:170], alpha = 4)
+#'     ipfEst <- ipfProximity(ipftrain[1:10, 1:168], ipfpwap, ipftrain[1:10, 169:170], alpha = 4)
 #'
 #' @importFrom methods new
 #'
 #' @export
-ipfProx <- function(bpos, rssirange = c(-100, 0), norssi = NA, alpha = 5, wapPow1 = -30) {
+ipfProximity <- function(bpos, rssirange = c(-100, 0), norssi = NA, alpha = 5, wapPow1 = -30) {
 
   return(structure(list(
       params = list(name = 'prox',
@@ -591,7 +595,7 @@ prox <- function(fingerprints, fgps_pos, bpos, rssirange, norssi, alpha, wapPow1
 #'     estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
 #'
 #'\dontrun{
-#'     model <- ipfProb(ipftrain[, 1:168], ipftrain[, 169:170], k = 9, delta = 10)
+#'     model <- ipfProbabilistic(ipftrain[, 1:168], ipftrain[, 169:170], k = 9, delta = 10)
 #'     estimation <- ipfEstimate(model, ipftest[, 1:170], ipftest[, 169:170])
 #' }
 #' @importFrom dplyr group_by summarise_all arrange "%>%" funs
@@ -801,7 +805,7 @@ rmce_getNG <- function(locdata) {
 
 # AVERAGE DENSITY OF OBSERVATIONS
 rmce_getADP <- function(locdata) {
-  return(mean(rowMeans(ipfDist(locdata, locdata), na.rm = TRUE)))
+  return(mean(rowMeans(ipfDistance(locdata, locdata), na.rm = TRUE)))
 }
 
 # AVERAGE DENSITY OF GROUPS
@@ -1131,16 +1135,16 @@ ipfPlotEcdf <- function(estimation, xlab = 'error',
 #'
 #' @examples
 #'
-#'     ipfPlotLoc(ipftrain[, 169:170])
+#'     ipfPlotLocation(ipftrain[, 169:170])
 #'
-#'     ipfPlotLoc(ipftrain[, 169:170], plabel = TRUE, reverseAxis = TRUE,
-#'                title = 'Position of training set observations')
+#'     ipfPlotLocation(ipftrain[, 169:170], plabel = TRUE, reverseAxis = TRUE,
+#'                     title = 'Position of training set observations')
 #'
 #' @importFrom dplyr group_by summarise_all arrange "%>%" funs
 #' @importFrom ggplot2 ggplot aes geom_point geom_text geom_rect
 #'
 #' @export
-ipfPlotLoc <- function(positions, plabel = FALSE, reverseAxis = FALSE, xlab = NULL, ylab = NULL,
+ipfPlotLocation <- function(positions, plabel = FALSE, reverseAxis = FALSE, xlab = NULL, ylab = NULL,
                        title = '', pgrid = FALSE) {
 
   if (reverseAxis) {
@@ -1201,7 +1205,7 @@ ipfPlotLoc <- function(positions, plabel = FALSE, reverseAxis = FALSE, xlab = NU
     groups <- ipfGroup(positions)
     label.data <- positions
     label.data$GROUP = groups
-    label.data <- label.data %>% group_by(GROUP) %>% summarise_all(funs(mean)) %>% arrange(GROUP)
+    label.data <- data.frame(label.data %>% group_by(GROUP) %>% summarise_all(funs(mean)) %>% arrange(GROUP))
     p <- p + geom_text(
       data = label.data,
       aes(x = label.data[, 2], y = label.data[, 3], label = label.data$GROUP),
@@ -1215,6 +1219,7 @@ ipfPlotLoc <- function(positions, plabel = FALSE, reverseAxis = FALSE, xlab = NU
   if (is.null(ylab)) {
     ylab <- colnames(positions)[2]
   }
+
   p <- p + labs(y = ylab, x = xlab) + labs(title = title)
 
   p
@@ -1238,15 +1243,16 @@ ipfPlotLoc <- function(positions, plabel = FALSE, reverseAxis = FALSE, xlab = NU
 #'
 #'     model      <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170])
 #'     estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
-#'     ipfPlotEst(model, estimation, ipftest[, 169:170], observations = seq(7,10),
-#'                showneighbors = TRUE, reverseAxis = TRUE)
+#'     ipfPlotEstimation(model, estimation, ipftest[, 169:170],
+#'                       observations = seq(7,10), showneighbors = TRUE,
+#'                       reverseAxis = TRUE)
 #'
 #' @importFrom ggplot2 ggplot aes geom_point geom_segment geom_curve arrow unit
 #'
 #' @export
-ipfPlotEst <- function(model, estimation, testpos = NULL, observations = c(1),
-                       reverseAxis = FALSE, showneighbors = FALSE, showLabels = FALSE,
-                       xlab = NULL, ylab = NULL, title = '') {
+ipfPlotEstimation <- function(model, estimation, testpos = NULL, observations = c(1),
+                              reverseAxis = FALSE, showneighbors = FALSE, showLabels = FALSE,
+                              xlab = NULL, ylab = NULL, title = '') {
 
   ePoints <- as.data.frame(matrix(as.matrix(estimation$location[observations, ]), length(observations), 2))
   if (reverseAxis) {
@@ -1258,8 +1264,8 @@ ipfPlotEst <- function(model, estimation, testpos = NULL, observations = c(1),
 
   sPoints <- NULL
 
-  p <- ggplot() + geom_point(data = ePoints, aes(x = ePoints[, 1],
-                                                 y = ePoints[, 2]), size = 3, alpha = 0.5)
+  p <- ggplot() + geom_point(data = ePoints, aes(x = ePoints[, 1], y = ePoints[, 2]),
+                             size = 6, alpha = 1, shape = 0)
 
   if (showneighbors) {
     nPoints <- NULL
@@ -1275,10 +1281,10 @@ ipfPlotEst <- function(model, estimation, testpos = NULL, observations = c(1),
     }
 
     p <- p + geom_point(data = nPoints, aes(x = nPoints[, 1], y = nPoints[, 2]),
-                        size = 1.5, alpha = 0.75, col = 'orange') +
+                        size = 5, col = 'black', shape = 4) +
              geom_segment(data = sPoints, aes(x = sPoints[,1], xend = sPoints[, 3],
                                               y = sPoints[, 2], yend = sPoints[, 4]),
-               alpha = 0.25, col = 'blue', size = 2)
+               alpha = 0.5, col = 'blue', size = 1, linetype = 'dashed')
   }
 
 
@@ -1290,13 +1296,13 @@ ipfPlotEst <- function(model, estimation, testpos = NULL, observations = c(1),
     cPoints[cPoints[,1] == cPoints[,3] & cPoints[,2] == cPoints[,4], ] <- NA
     p <- p + geom_point(data = cPoints,
                        aes(x = cPoints[, 3], y = cPoints[, 4]),
-                       size = 4, alpha = 0.5, col = 'green', na.rm = TRUE)
+                       size = 4, alpha = 1, col = 'blue', shape = 1,  na.rm = TRUE)
     p <- p + geom_curve(data = cPoints,
                         aes(x = cPoints[,3], xend = cPoints[, 1],
                             y = cPoints[, 4], yend = cPoints[, 2]),
-                        alpha = 0.4, col = 'red', size = 1,
-                        arrow = arrow(length = unit(0.03, "npc")),
-                        curvature = 0.15, na.rm = TRUE)
+                        alpha = 0.7, col = 'red', size = 1,
+                        arrow = arrow(length = unit(0.02, "npc")),
+                        curvature = 0.2, na.rm = TRUE)
   }
 
   if (showLabels) {
@@ -1304,7 +1310,7 @@ ipfPlotEst <- function(model, estimation, testpos = NULL, observations = c(1),
     p <- p + geom_text(
       data = ePoints,
       aes(x = ePoints[, 1], y = ePoints[, 2], label = ePoints$LABELS),
-      hjust = 0, vjust = 0, color = 'black', size = 4)
+      hjust = -0.5, vjust = -0.5, color = 'black', size = 4)
   }
 
   if (is.null(xlab)) {

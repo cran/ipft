@@ -9,8 +9,8 @@ Data from the positioning tutorial of the seventh international conference on in
 Navigation (IPIN2016).}
 \format{A data frame with columns:
 \describe{
- \item{LONGITUDE}{Longitude in meters relative to the origin of a predefined coordinate system. From -61 to 50}
- \item{LATITUDE}{Latitude in meters relative to the origin of a predefined coordinate system. From 8.5 to 117.5}
+ \item{X}{X coordinate in meters relative to the origin of a predefined Cartesian coordinate system. From -61 to 50}
+ \item{Y}{Y coordinate in meters relative to the origin of a predefined Cartesian coordinate system. From 8.5 to 117.5}
 }}
 \source{
 UJI - Institute of New Imaging Technologies, Universitat Jaume I,

@@ -7,7 +7,7 @@ using namespace Rcpp;
 
 // ipfLGD
 NumericMatrix ipfLGD(NumericMatrix train, NumericMatrix test, double sd, double epsilon);
-RcppExport SEXP ipft_ipfLGD(SEXP trainSEXP, SEXP testSEXP, SEXP sdSEXP, SEXP epsilonSEXP) {
+RcppExport SEXP _ipft_ipfLGD(SEXP trainSEXP, SEXP testSEXP, SEXP sdSEXP, SEXP epsilonSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -21,7 +21,7 @@ END_RCPP
 }
 // ipfPLGD
 NumericMatrix ipfPLGD(NumericMatrix train, NumericMatrix test, double sd, double epsilon, double alpha, double threshold);
-RcppExport SEXP ipft_ipfPLGD(SEXP trainSEXP, SEXP testSEXP, SEXP sdSEXP, SEXP epsilonSEXP, SEXP alphaSEXP, SEXP thresholdSEXP) {
+RcppExport SEXP _ipft_ipfPLGD(SEXP trainSEXP, SEXP testSEXP, SEXP sdSEXP, SEXP epsilonSEXP, SEXP alphaSEXP, SEXP thresholdSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -37,7 +37,7 @@ END_RCPP
 }
 // ipfEuclidean
 NumericMatrix ipfEuclidean(NumericMatrix train, NumericMatrix test);
-RcppExport SEXP ipft_ipfEuclidean(SEXP trainSEXP, SEXP testSEXP) {
+RcppExport SEXP _ipft_ipfEuclidean(SEXP trainSEXP, SEXP testSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -49,7 +49,7 @@ END_RCPP
 }
 // ipfManhattan
 NumericMatrix ipfManhattan(NumericMatrix train, NumericMatrix test);
-RcppExport SEXP ipft_ipfManhattan(SEXP trainSEXP, SEXP testSEXP) {
+RcppExport SEXP _ipft_ipfManhattan(SEXP trainSEXP, SEXP testSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -61,7 +61,7 @@ END_RCPP
 }
 // ipfNormDistance
 NumericMatrix ipfNormDistance(NumericMatrix train, NumericMatrix test, double normVal);
-RcppExport SEXP ipft_ipfNormDistance(SEXP trainSEXP, SEXP testSEXP, SEXP normValSEXP) {
+RcppExport SEXP _ipft_ipfNormDistance(SEXP trainSEXP, SEXP testSEXP, SEXP normValSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -71,4 +71,18 @@ BEGIN_RCPP
     rcpp_result_gen = Rcpp::wrap(ipfNormDistance(train, test, normVal));
     return rcpp_result_gen;
 END_RCPP
+}
+
+static const R_CallMethodDef CallEntries[] = {
+    {"_ipft_ipfLGD", (DL_FUNC) &_ipft_ipfLGD, 4},
+    {"_ipft_ipfPLGD", (DL_FUNC) &_ipft_ipfPLGD, 6},
+    {"_ipft_ipfEuclidean", (DL_FUNC) &_ipft_ipfEuclidean, 2},
+    {"_ipft_ipfManhattan", (DL_FUNC) &_ipft_ipfManhattan, 2},
+    {"_ipft_ipfNormDistance", (DL_FUNC) &_ipft_ipfNormDistance, 3},
+    {NULL, NULL, 0}
+};
+
+RcppExport void R_init_ipft(DllInfo *dll) {
+    R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
+    R_useDynamicSymbols(dll, FALSE);
 }

@@ -4,8 +4,8 @@
 \alias{ipfTransform}
 \title{Transform function}
 \usage{
-ipfTransform(data, outRange = c(0, 100), outNoRSSI = 0, inRange = NULL,
-  inNoRSSI = 0, trans = "linear", base = exp(1), alpha = 24)
+ipfTransform(data, outRange = c(0, 1), outNoRSSI = 0, inRange = NULL,
+  inNoRSSI = 0, trans = "scale", base = exp(1), alpha = 24)
 }
 \arguments{
 \item{data}{a vector, matrix or data frame containing the RSSI vectors}
@@ -19,7 +19,7 @@ initial data}
 
 \item{inNoRSSI}{value used in the RSSI data to represent a not detected AP.}
 
-\item{trans}{the transformation to perform, 'linear' or 'exponential'}
+\item{trans}{the transformation to perform, 'scale' or 'exponential'}
 
 \item{base}{base for the 'exponential' transformation}
 

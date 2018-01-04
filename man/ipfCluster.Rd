@@ -19,7 +19,11 @@ methods are:
 
 \item{grid}{a vector with the grid size for the 'grid' method}
 
-\item{...}{additional parameters for apcluster and apclusterK}
+\item{...}{additional parameters for k-means, apcluster and apclusterK
+for 'k-means' method additional parameters see:
+https://stat.ethz.ch/R-manual/R-devel/library/stats/html/kmeans.html
+for 'apcluster'AP' method additional parameters see:
+https://cran.r-project.org/web/packages/apcluster/index.html}
 }
 \value{
 A list with:
