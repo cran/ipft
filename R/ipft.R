@@ -741,7 +741,7 @@ minim <- function(par, fingerprint, wapPos, wP1, alpha) {
 # Function to minimize to find position from fingerprint and WAPs location
 df <- function(pos, d1, wapPos, w) {
   d2 <- apply(wapPos, 1, function(x) sqrt((x[1] - pos[1])^2 + (x[2] - pos[2])^2))
-  sum(sapply(1:ncol(d1), function(i) w[i] * (d1[,i] - d2[i])^2), na.rm = TRUE)
+  sum(unlist(sapply(1:ncol(d1), function(i) w[i] * (d1[,i] - d2[i])^2)), na.rm = TRUE)
 }
 
 
