@@ -38,8 +38,9 @@ This function implements a probabilistic algorithm
 }
 \examples{
 
-    groups <- ipfGroup(ipftrain, X, Y)
-    model <- ipfProbabilistic(ipftrain[, 1:168], ipftrain[, 169:170], groups = groups)
+    train <- ipftrain[1:200, ]
+    groups <- ipfGroup(train, X, Y)
+    model <- ipfProbabilistic(train[, 1:168], train[, 169:170], groups = groups)
 
 \dontrun{
     model <- ipfProbabilistic(ipftrain[, 1:168], ipftrain[, 169:170], k = 9, delta = 10)

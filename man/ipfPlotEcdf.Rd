@@ -22,8 +22,8 @@ Plots the cumulative distribution function of the estimated error
 }
 \examples{
 
-    model <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170])
-    estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
+    model <- ipfKnn(ipftrain[1:200, 1:168], ipftrain[1:200, 169:170])
+    estimation <- ipfEstimate(model, ipftest[1:20, 1:168], ipftest[1:20, 169:170])
     ipfPlotEcdf(estimation)
 
 }

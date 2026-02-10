@@ -24,6 +24,9 @@ Estimates the positions of the emitter beacons
 }
 \examples{
 
-    wapp <- ipfEstimateBeaconPositions(ipftrain[, 1:168], ipftrain[, 169:170], method = 'wcentroid')
+    wapp <- ipfEstimateBeaconPositions(
+      ipftrain[1:100, 1:168], ipftrain[1:100, 169:170],
+      method = 'wcentroid'
+    )
 
 }

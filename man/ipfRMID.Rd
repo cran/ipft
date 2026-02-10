@@ -27,6 +27,6 @@ Estimates the inherent difficulty of the radio map
 }
 \examples{
 \dontrun{
-    rmid <- ipfRMID(ipftrain[, 1:168], ipftrain[, 169:170], noRSSI = NA)
+    rmid <- ipfRMID(ipftrain[1:200, 1:168], ipftrain[1:200, 169:170], noRSSI = NA)
 }
 }

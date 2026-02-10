@@ -26,9 +26,10 @@ GRIDSIZE <- 5
 #'     test observations to train observations
 #'
 #' @examples
-#'     dist <- ipfDistance(ipftrain[,1:168], ipftest[,1:168])
+#'     dist <- ipfDistance(ipftrain[1:50, 1:20], ipftest[1:20, 1:20])
 #'
-#'     dist <- ipfDistance(ipftrain, ipftest, subset = c('X', 'Y'), method = 'manhattan')
+#'     dist <- ipfDistance(ipftrain[1:50, ], ipftest[1:20, ], subset = c('X', 'Y'),
+#'                        method = 'manhattan')
 #'
 #' @useDynLib ipft
 #' @importFrom Rcpp sourceCpp
@@ -36,24 +37,38 @@ GRIDSIZE <- 5
 #' @export
 ipfDistance <- function(train, test, method = 'euclidean', subset = NULL, norm = 2,
                         sd = 10, epsilon = 1e-30, alpha = 20, threshold = 20) {
+  train_has_dim <- !is.null(dim(train))
+  test_has_dim <- !is.null(dim(test))
+
   if (is.null(subset)) {
     m_train <- as.matrix(train)
     m_test  <- as.matrix(test)
   } else {
-    m_train <- as.matrix(train[, subset])
-    m_test  <- as.matrix(test[, subset])
+    if (!train_has_dim || !test_has_dim) {
+      stop("subset can only be used when train and test are matrices or data frames.")
+    }
+    m_train <- as.matrix(train[, subset, drop = FALSE])
+    m_test  <- as.matrix(test[, subset, drop = FALSE])
   }
-  if (ncol(m_train) == 1) {m_train <- t(m_train)}
-  if (ncol(m_test) == 1) {m_test <- t(m_test)}
-  switch(method,
-         'euclidean' = dist <- ipfEuclidean(m_train, m_test),
-         'manhattan' = dist <- ipfManhattan(m_train, m_test),
-         'norm'      = dist <- ipfNormDistance(m_train, m_test, norm),
-         'LGD'       = dist <- ipfLGD(m_train, m_test, sd, epsilon),
-         'PLGD'      = dist <- ipfPLGD(m_train, m_test, sd, epsilon, alpha, threshold),
-         stop("invalid distance method.")
-         )
-  return(dist)
+
+  # Vectors are treated as a single observation (one row).
+  # One-column matrices/data.frames are treated as multiple observations (one column feature).
+  if (!train_has_dim && ncol(m_train) == 1L) m_train <- t(m_train)
+  if (!test_has_dim && ncol(m_test) == 1L) m_test  <- t(m_test)
+
+  if (ncol(m_train) != ncol(m_test)) {
+    stop("train and test must have the same number of columns.")
+  }
+
+  dist <- switch(method,
+                 euclidean = ipfEuclidean(m_train, m_test),
+                 manhattan = ipfManhattan(m_train, m_test),
+                 norm      = ipfNormDistance(m_train, m_test, norm),
+                 LGD       = ipfLGD(m_train, m_test, sd, epsilon),
+                 PLGD      = ipfPLGD(m_train, m_test, sd, epsilon, alpha, threshold),
+                 stop("invalid distance method.")
+  )
+  dist
 }
 
 #' Transform function
@@ -82,32 +97,49 @@ ipfDistance <- function(train, test, method = 'euclidean', subset = NULL, norm =
 #' @export
 ipfTransform <- function(data, outRange = c(0, 1), outNoRSSI = 0, inRange = NULL,
                          inNoRSSI = 0, trans = 'scale', base = exp(1), alpha = 24) {
-  tdata <- data
   if (is.null(inRange)) {
-    if (is.na(inNoRSSI)) {
-      mx <- max(data, na.rm = TRUE)
-      mn <- min(data, na.rm = TRUE)
-    } else {
-      mx <- max(data[data == inNoRSSI] <- NA, na.rm = TRUE)
-      mn <- min(data[data == inNoRSSI] <- NA, na.rm = TRUE)
+    data_for_range <- as.matrix(data)
+    if (!is.na(inNoRSSI)) {
+      data_for_range[data_for_range == inNoRSSI] <- NA
     }
-    inRange = c(mx, mn)
+    mx <- suppressWarnings(max(data_for_range, na.rm = TRUE))
+    mn <- suppressWarnings(min(data_for_range, na.rm = TRUE))
+    if (!is.finite(mx) || !is.finite(mn)) {
+      stop("ipfTransform: unable to infer inRange from data; provide inRange explicitly.")
+    }
+    inRange <- c(mn, mx)
   }
 
+  if (!is.numeric(inRange) || length(inRange) != 2) {
+    stop("ipfTransform: inRange must be a numeric vector of length 2.")
+  }
+  if (inRange[1] == inRange[2]) {
+    stop("ipfTransform: inRange values must be different.")
+  }
+  if (!is.numeric(outRange) || length(outRange) != 2) {
+    stop("ipfTransform: outRange must be a numeric vector of length 2.")
+  }
+
+  transform_fun <- NULL
   if (trans == 'scale') {
-    tdata[] <- lapply(data, trans_lin, imin = inRange[1], imax = inRange[2], omin = outRange[1],
-                     omax = outRange[2], ins = inNoRSSI, ons = outNoRSSI)
+    transform_fun <- function(x) trans_lin(x, imin = inRange[1], imax = inRange[2],
+                                           omin = outRange[1], omax = outRange[2],
+                                           ins = inNoRSSI, ons = outNoRSSI)
   } else if (trans == 'exponential') {
-    tdata[] <- lapply(data, trans_exp, imin = inRange[1], imax = inRange[2], omin = outRange[1],
-                     omax = outRange[2], ins = inNoRSSI, a = alpha)
+    transform_fun <- function(x) trans_exp(x, imin = inRange[1], imax = inRange[2],
+                                           omin = outRange[1], omax = outRange[2],
+                                           ins = inNoRSSI, a = alpha, base = base)
+  } else {
+    stop("ipfTransform: invalid transformation.")
   }
-  if (is.vector(data)) {
-    tdata <- unlist(tdata)
-  } else if (is.matrix(data)) {
-    tdata <- unlist(tdata)
-    dim(tdata) <- dim(data)
+
+  if (is.data.frame(data)) {
+    tdata <- data
+    tdata[] <- lapply(data, transform_fun)
+    return(tdata)
   }
-  return(tdata)
+
+  transform_fun(data)
 }
 
 trans_lin <- function(x, imin, imax, omin, omax, ins,  ons) {
@@ -124,9 +156,9 @@ trans_lin <- function(x, imin, imax, omin, omax, ins,  ons) {
   x
 }
 
-trans_exp <- function(x, imin, imax, omin, omax, ins, a) {
+trans_exp <- function(x, imin, imax, omin, omax, ins, a, base = exp(1)) {
   x <- trans_lin(x, imin, imax, omin = 0, omax = imax - imin, ins = ins, ons = 0)
-  x <- exp(x/a) / exp(-imin/a)
+  x <- base^(x/a) / base^(-imin/a)
   x
 }
 
@@ -150,15 +182,20 @@ trans_exp <- function(x, imin, imax, omin, omax, ins, a) {
 #'
 #'     group <- ipfGroup(ipftrain, X, Y)
 #'
-#' @importFrom dplyr group_indices group_indices_
+#' @importFrom dplyr group_indices
 #'
 #' @export
 ipfGroup <- function(data, ...) {
   if (missing(..0)) {
-    return(group_indices_(data, .dots = colnames(data)))
-  } else {
-    return(group_indices(data, ...))
+    data <- as.data.frame(data)
+    if (ncol(data) == 0) {
+      return(rep(1L, nrow(data)))
+    }
+    grouped <- dplyr::group_by(data, dplyr::across(dplyr::all_of(colnames(data))))
+    return(dplyr::group_indices(grouped))
   }
+  grouped <- dplyr::group_by(as.data.frame(data), ...)
+  dplyr::group_indices(grouped)
 }
 
 #' Creates clusters using the specified method
@@ -265,31 +302,50 @@ ipfCluster <- function(data, method = 'k-means', k = NULL, grid = NULL, ...) {
 #'
 #' @examples
 #'
-#'     wapp <- ipfEstimateBeaconPositions(ipftrain[, 1:168], ipftrain[, 169:170], method = 'wcentroid')
+#'     wapp <- ipfEstimateBeaconPositions(
+#'       ipftrain[1:100, 1:168], ipftrain[1:100, 169:170],
+#'       method = 'wcentroid'
+#'     )
 #'
 #' @export
 ipfEstimateBeaconPositions <- function(fingerprints, positions, method = 'wcentroid', rssirange = c(-100, 0),
                                        norssi = NA) {
 
-  tdata <- fingerprints
+  fp <- as.matrix(fingerprints)
+  pos <- as.matrix(positions)
+
+  if (nrow(fp) != nrow(pos)) {
+    stop("fingerprints and positions must have the same number of rows.")
+  }
 
   if (method == 'wcentroid') {
-    tdata[] <- lapply(fingerprints, ipfTransform, inRange = rssirange, outRange = c(0, 1),
-                      inNoRSSI = norssi, outNoRSSI = 0)
+    tdata <- ipfTransform(fp, inRange = rssirange, outRange = c(0, 1),
+                          inNoRSSI = norssi, outNoRSSI = 0)
   } else if (method == 'centroid') {
-    tdata[] <- lapply(fingerprints, function(x) x[x != norssi] <- 1)
+    tdata <- fp
+    if (is.na(norssi)) {
+      tdata[!is.na(tdata)] <- 1
+      tdata[is.na(tdata)] <- 0
+    } else {
+      tdata[!is.na(tdata) & tdata != norssi] <- 1
+      tdata[is.na(tdata) | tdata == norssi] <- 0
+    }
+  } else {
+    stop("invalid method selected.")
   }
 
-  # Normalize
-  tdata[] <- lapply(tdata, function(x) x / sum(x))
+  # Normalize weights per beacon (column).
+  col_sums <- colSums(tdata, na.rm = TRUE)
+  tdata <- sweep(tdata, 2, col_sums, "/")
+  tdata[, col_sums == 0] <- NA_real_
 
-  aploc <- matrix(0, ncol(fingerprints), ncol(positions))
-  for (i in 1:ncol(fingerprints)) {
-    aploc[i, 1] = sum(tdata[, i] * positions[, 1])
-    aploc[i, 2] = sum(tdata[, i] * positions[, 2])
+  aploc <- matrix(NA_real_, ncol(fp), ncol(pos))
+  for (i in seq_len(ncol(fp))) {
+    if (col_sums[i] == 0) next
+    aploc[i, ] <- colSums(pos * tdata[, i], na.rm = TRUE)
   }
   aploc[is.nan(aploc)] <- NA
-  return(aploc)
+  aploc
 }
 
 
@@ -398,7 +454,7 @@ knn <- function(tr_fgp, ts_fgp, k = 3, method = 'euclidean', weights = 'distance
 #' @param delta      parameter delta
 #' @param ...        additional parameters for provided function FUN
 #'
-#' @importFrom dplyr group_by summarise_all arrange "%>%" funs
+#' @importFrom dplyr group_by arrange "%>%"
 #'
 #' @return          An S3 object of class ipfModel, with the following properties:
 #'                  params ->     a list with the parameters passed to the function
@@ -407,8 +463,9 @@ knn <- function(tr_fgp, ts_fgp, k = 3, method = 'euclidean', weights = 'distance
 #'
 #' @examples
 #'
-#'     groups <- ipfGroup(ipftrain, X, Y)
-#'     model <- ipfProbabilistic(ipftrain[, 1:168], ipftrain[, 169:170], groups = groups)
+#'     train <- ipftrain[1:200, ]
+#'     groups <- ipfGroup(train, X, Y)
+#'     model <- ipfProbabilistic(train[, 1:168], train[, 169:170], groups = groups)
 #'
 #'\dontrun{
 #'     model <- ipfProbabilistic(ipftrain[, 1:168], ipftrain[, 169:170], k = 9, delta = 10)
@@ -426,6 +483,9 @@ ipfProbabilistic <- function(train_fgp, train_pos, group_cols = NULL, groups = N
     stop("Incorrect dimmension of groups. Should be equal to the number of training fingerprints.")
   }
 
+  train_fgp <- as.data.frame(train_fgp)
+  train_pos <- as.data.frame(train_pos)
+
   GROUP <- NULL
   sd <- NULL
   meanNA <- function(x) mean(x, na.rm = TRUE)
@@ -436,14 +496,29 @@ ipfProbabilistic <- function(train_fgp, train_pos, group_cols = NULL, groups = N
     if (is.null(group_cols)) {
       groups <- ipfGroup(train_pos)
     } else {
-      groups <- group_indices_(cbind(train_fgp, train_pos), .dots = group_cols)
+      group_data <- cbind(train_fgp, train_pos)
+      unknown_cols <- setdiff(group_cols, colnames(group_data))
+      if (length(unknown_cols) > 0) {
+        stop("Unknown columns in group_cols: ", paste(unknown_cols, collapse = ", "))
+      }
+      grouped <- dplyr::group_by(group_data, dplyr::across(dplyr::all_of(group_cols)))
+      groups <- dplyr::group_indices(grouped)
     }
   }
   train_fgp$GROUP <- groups
   train_pos$GROUP <- groups
-  tr_mns <- train_fgp %>% group_by(GROUP) %>% summarise_all(funs(meanNA)) %>% arrange(GROUP)
-  tr_sds <- train_fgp %>% group_by(GROUP) %>% summarise_all(funs(sdNA))   %>% arrange(GROUP)
-  tr_pos <- train_pos %>% group_by(GROUP) %>% summarise_all(funs(fPos))   %>% arrange(GROUP)
+  tr_mns <- train_fgp %>%
+    group_by(GROUP) %>%
+    dplyr::summarise(dplyr::across(dplyr::everything(), meanNA), .groups = "drop") %>%
+    arrange(GROUP)
+  tr_sds <- train_fgp %>%
+    group_by(GROUP) %>%
+    dplyr::summarise(dplyr::across(dplyr::everything(), sdNA), .groups = "drop") %>%
+    arrange(GROUP)
+  tr_pos <- train_pos %>%
+    group_by(GROUP) %>%
+    dplyr::summarise(dplyr::across(dplyr::everything(), fPos), .groups = "drop") %>%
+    arrange(GROUP)
 
   tr_mns$GROUP <- NULL
   tr_sds$GROUP <- NULL
@@ -591,70 +666,50 @@ prox <- function(fingerprints, fgps_pos, bpos, rssirange, norssi, alpha, wapPow1
 #'
 #' @examples
 #'
-#'     model <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170])
-#'     estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
+#'     model <- ipfKnn(ipftrain[1:200, 1:168], ipftrain[1:200, 169:170])
+#'     estimation <- ipfEstimate(model, ipftest[1:20, 1:168], ipftest[1:20, 169:170])
 #'
 #'\dontrun{
 #'     model <- ipfProbabilistic(ipftrain[, 1:168], ipftrain[, 169:170], k = 9, delta = 10)
 #'     estimation <- ipfEstimate(model, ipftest[, 1:170], ipftest[, 169:170])
 #' }
-#' @importFrom dplyr group_by summarise_all arrange "%>%" funs
+#' @importFrom dplyr group_by arrange "%>%"
 #'
 #' @importFrom methods new
 #'
 #' @export
 ipfEstimate <- function(ipfmodel, test_fgp, test_pos = NULL) {
-  if (class(ipfmodel) != 'ipfModel') {stop("Wrong parameter type for wfmodel.")}
+  if (!inherits(ipfmodel, "ipfModel")) {
+    stop("ipfEstimate: Wrong parameter type. ipfModel expected.")
+  }
+
+  extra_params <- ipfmodel$params$extra_params
+  if (is.null(extra_params)) extra_params <- list()
 
   if (ipfmodel$params$name == 'prob') {
-    if (is.null(unlist(ipfmodel$params$extra_params))) {
-      est <- prob(
-        tr_mns = ipfmodel$data$means,
-        tr_sds = ipfmodel$data$sds,
-        ts_fgp = test_fgp,
-        k = ipfmodel$params$k,
-        FUN = ipfmodel$params$FUN,
-        delta = ipfmodel$params$delta)
-    } else {
-      est <- prob(
-        tr_mns = ipfmodel$data$means,
-        tr_sds = ipfmodel$data$sds,
-        ts_fgp = test_fgp,
-        k = ipfmodel$params$k,
-        FUN = ipfmodel$params$FUN,
-        delta = ipfmodel$params$delta,
-        unlist(ipfmodel$params$extra_params))
-    }
+    est <- do.call(prob, c(list(
+      tr_mns = ipfmodel$data$means,
+      tr_sds = ipfmodel$data$sds,
+      ts_fgp = test_fgp,
+      k = ipfmodel$params$k,
+      FUN = ipfmodel$params$FUN,
+      delta = ipfmodel$params$delta
+    ), extra_params))
 
   } else if (ipfmodel$params$name == 'knn') {
-    if (is.null(unlist(ipfmodel$params$extra_params))) {
-      est <- knn(
-        tr_fgp = ipfmodel$data$fingerprints,
-        ts_fgp = test_fgp,
-        k = ipfmodel$params$k,
-        method = ipfmodel$params$method,
-        weights = ipfmodel$params$weights,
-        norm = ipfmodel$params$norm,
-        sd = ipfmodel$params$sd,
-        epsilon = ipfmodel$params$epsilon,
-        alpha = ipfmodel$params$alpha,
-        threshold = ipfmodel$params$threshold,
-        FUN = ipfmodel$params$FUN)
-    } else {
-      est <- knn(
-        tr_fgp = ipfmodel$data$fingerprints,
-        ts_fgp = test_fgp,
-        k = ipfmodel$params$k,
-        method = ipfmodel$params$method,
-        weights = ipfmodel$params$weights,
-        norm = ipfmodel$params$norm,
-        sd = ipfmodel$params$sd,
-        epsilon = ipfmodel$params$epsilon,
-        alpha = ipfmodel$params$alpha,
-        threshold = ipfmodel$params$threshold,
-        FUN = ipfmodel$params$FUN,
-        unlist(ipfmodel$params$extra_params))
-    }
+    est <- do.call(knn, c(list(
+      tr_fgp = ipfmodel$data$fingerprints,
+      ts_fgp = test_fgp,
+      k = ipfmodel$params$k,
+      method = ipfmodel$params$method,
+      weights = ipfmodel$params$weights,
+      norm = ipfmodel$params$norm,
+      sd = ipfmodel$params$sd,
+      epsilon = ipfmodel$params$epsilon,
+      alpha = ipfmodel$params$alpha,
+      threshold = ipfmodel$params$threshold,
+      FUN = ipfmodel$params$FUN
+    ), extra_params))
   } else if (ipfmodel$params$name == 'prox') {
     return (prox(
       fingerprints = test_fgp,
@@ -798,7 +853,6 @@ rmce_getNP <- function(locdata) {
 }
 
 # NUMBER OF GROUPS
-#' @importFrom dplyr group_indices_
 rmce_getNG <- function(locdata) {
   return(length(unique(ipfGroup(locdata))))
 }
@@ -809,14 +863,17 @@ rmce_getADP <- function(locdata) {
 }
 
 # AVERAGE DENSITY OF GROUPS
-#' @importFrom dplyr group_indices_ group_by summarise_all arrange "%>%" funs
+#' @importFrom dplyr group_by arrange "%>%"
 #'
 rmce_getADG <- function(locdata) {
   meanNA <- function(x) mean(x, na.rm = TRUE)
   GROUP <- NULL
-  gr <- group_indices_(locdata, .dots = names(locdata))
+  gr <- ipfGroup(locdata)
   locdata$GROUP <- gr
-  locdata <- locdata %>% group_by(GROUP) %>% summarise_all(funs(meanNA)) %>% arrange(GROUP)
+  locdata <- locdata %>%
+    group_by(GROUP) %>%
+    dplyr::summarise(dplyr::across(dplyr::everything(), meanNA), .groups = "drop") %>%
+    arrange(GROUP)
   locdata$GROUP <- NULL
   locdata <- as.data.frame(locdata)
   return(rmce_getADP(locdata))
@@ -980,7 +1037,7 @@ ipfrmdata <- function(fingerprints, positions, rangeRSSI, noRSSI, gridSize) {
 #'
 #' @examples
 #'\dontrun{
-#'     rmid <- ipfRMID(ipftrain[, 1:168], ipftrain[, 169:170], noRSSI = NA)
+#'     rmid <- ipfRMID(ipftrain[1:200, 1:168], ipftrain[1:200, 169:170], noRSSI = NA)
 #'}
 #' @export
 ipfRMID <- function(fingerprints, positions, rangeRSSI = c(-100, 0), noRSSI = NA,
@@ -1013,8 +1070,8 @@ rectAD <- function(L1, L2) {
 #'
 #' @examples
 #'
-#'     model <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170])
-#'     estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
+#'     model <- ipfKnn(ipftrain[1:200, 1:168], ipftrain[1:200, 169:170])
+#'     estimation <- ipfEstimate(model, ipftest[1:20, 1:168], ipftest[1:20, 169:170])
 #'     ipfPlotPdf(estimation)
 #'
 #' @importFrom ggplot2 ggplot aes geom_histogram geom_density geom_vline scale_color_manual
@@ -1024,7 +1081,7 @@ rectAD <- function(L1, L2) {
 #' @export
 ipfPlotPdf <- function(estimation, xlab = 'error', ylab = 'density',
                        title = 'Probability density function') {
-  if (class(estimation) == "ipfEstimation") {
+  if (inherits(estimation, "ipfEstimation")) {
     if (is.null(estimation$errors)) {
       stop("The estimation has no errors data.")
     }
@@ -1073,8 +1130,8 @@ ipfPlotPdf <- function(estimation, xlab = 'error', ylab = 'density',
 #'
 #' @examples
 #'
-#'     model <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170])
-#'     estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
+#'     model <- ipfKnn(ipftrain[1:200, 1:168], ipftrain[1:200, 169:170])
+#'     estimation <- ipfEstimate(model, ipftest[1:20, 1:168], ipftest[1:20, 169:170])
 #'     ipfPlotEcdf(estimation)
 #'
 #' @importFrom ggplot2 ggplot aes stat_ecdf geom_vline scale_color_manual element_text
@@ -1086,7 +1143,7 @@ ipfPlotPdf <- function(estimation, xlab = 'error', ylab = 'density',
 ipfPlotEcdf <- function(estimation, xlab = 'error',
                         ylab = 'cumulative density of error',
                         title = 'Empirical cumulative density function') {
-  if (class(estimation) == "ipfEstimation") {
+  if (inherits(estimation, "ipfEstimation")) {
     if (is.null(estimation$errors)) {
       stop("The estimation has no errors data.")
     }
@@ -1140,7 +1197,7 @@ ipfPlotEcdf <- function(estimation, xlab = 'error',
 #'     ipfPlotLocation(ipftrain[, 169:170], plabel = TRUE, reverseAxis = TRUE,
 #'                     title = 'Position of training set observations')
 #'
-#' @importFrom dplyr group_by summarise_all arrange "%>%" funs
+#' @importFrom dplyr group_by arrange "%>%"
 #' @importFrom ggplot2 ggplot aes geom_point geom_text geom_rect
 #'
 #' @export
@@ -1205,7 +1262,10 @@ ipfPlotLocation <- function(positions, plabel = FALSE, reverseAxis = FALSE, xlab
     groups <- ipfGroup(positions)
     label.data <- positions
     label.data$GROUP = groups
-    label.data <- data.frame(label.data %>% group_by(GROUP) %>% summarise_all(funs(mean)) %>% arrange(GROUP))
+    label.data <- data.frame(label.data %>%
+      group_by(GROUP) %>%
+      dplyr::summarise(dplyr::across(dplyr::everything(), mean), .groups = "drop") %>%
+      arrange(GROUP))
     p <- p + geom_text(
       data = label.data,
       aes(x = label.data[, 2], y = label.data[, 3], label = label.data$GROUP),
@@ -1241,10 +1301,10 @@ ipfPlotLocation <- function(positions, plabel = FALSE, reverseAxis = FALSE, xlab
 #'
 #' @examples
 #'
-#'     model      <- ipfKnn(ipftrain[, 1:168], ipftrain[, 169:170])
-#'     estimation <- ipfEstimate(model, ipftest[, 1:168], ipftest[, 169:170])
-#'     ipfPlotEstimation(model, estimation, ipftest[, 169:170],
-#'                       observations = seq(7,10), showneighbors = TRUE,
+#'     model      <- ipfKnn(ipftrain[1:200, 1:168], ipftrain[1:200, 169:170])
+#'     estimation <- ipfEstimate(model, ipftest[1:20, 1:168], ipftest[1:20, 169:170])
+#'     ipfPlotEstimation(model, estimation, ipftest[1:20, 169:170],
+#'                       observations = 1:4, showneighbors = TRUE,
 #'                       reverseAxis = TRUE)
 #'
 #' @importFrom ggplot2 ggplot aes geom_point geom_segment geom_curve arrow unit
